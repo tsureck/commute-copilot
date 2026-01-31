@@ -1,75 +1,111 @@
 {
-    "connections": [
+  "connections": [
+    {
+      "id": "conn_1",
+      "departure": "2026-01-31T07:34:00+01:00",
+      "arrival": "2026-01-31T08:49:00+01:00",
+      "durationMinutes": 75,
+      "legs": [
+        {
+          "mode": "train",
+          "line": "RE4",
+          "operator": "DB Regio",
+          "from": { "name": "Hamburg Hbf" },
+          "to": { "name": "Bremen Hbf" },
+          "scheduledDeparture": "2026-01-31T07:34:00+01:00",
+          "realtimeDeparture": null,
+          "scheduledArrival": "2026-01-31T08:49:00+01:00",
+          "realtimeArrival": null,
+          "status": "CANCELLED",
+          "remarks": [
+            "Cancelled due to operational disruption (e.g., signal failure)."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "conn_2",
+      "departure": "2026-01-31T08:06:00+01:00",
+      "arrival": "2026-01-31T09:36:00+01:00",
+      "durationMinutes": 90,
+      "legs": [
+        {
+          "mode": "train",
+          "line": "RE4",
+          "operator": "DB Regio",
+          "from": { "name": "Hamburg Hbf" },
+          "to": { "name": "Bremen Hbf" },
+          "scheduledDeparture": "2026-01-31T08:06:00+01:00",
+          "realtimeDeparture": "2026-01-31T08:18:00+01:00",
+          "delayMinutes": 12,
+          "scheduledArrival": "2026-01-31T09:21:00+01:00",
+          "realtimeArrival": "2026-01-31T09:36:00+01:00",
+          "status": "DELAYED",
+          "remarks": [
+            "Delay likely impacts arrival time."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "conn_3",
+      "departure": "2026-01-31T08:34:00+01:00",
+      "arrival": "2026-01-31T09:49:00+01:00",
+      "durationMinutes": 75,
+      "legs": [
+        {
+          "mode": "train",
+          "line": "RE4",
+          "operator": "DB Regio",
+          "from": { "name": "Hamburg Hbf" },
+          "to": { "name": "Bremen Hbf" },
+          "scheduledDeparture": "2026-01-31T08:34:00+01:00",
+          "realtimeDeparture": "2026-01-31T08:34:00+01:00",
+          "scheduledArrival": "2026-01-31T09:49:00+01:00",
+          "realtimeArrival": "2026-01-31T09:49:00+01:00",
+          "status": "ON_TIME"
+        }
+      ]
+    }
+  ],
+  "calendar": {
+    "events": [
       {
-        "id": "conn_1",
-        "departure": "2026-01-31T07:34:00+01:00",
-        "arrival": "2026-01-31T08:49:00+01:00",
-        "durationMinutes": 75,
-        "legs": [
-          {
-            "mode": "train",
-            "line": "RE4",
-            "operator": "DB Regio",
-            "from": { "name": "Hamburg Hbf" },
-            "to":   { "name": "Bremen Hbf" },
-            "scheduledDeparture": "2026-01-31T07:34:00+01:00",
-            "realtimeDeparture": null,
-            "scheduledArrival": "2026-01-31T08:49:00+01:00",
-            "realtimeArrival": null,
-            "status": "CANCELLED",
-            "remarks": [
-              "Cancelled due to operational disruption (e.g., signal failure)."
-            ]
-          }
-        ]
-      },
-      {
-        "id": "conn_2",
-        "departure": "2026-01-31T08:06:00+01:00",
-        "arrival": "2026-01-31T09:36:00+01:00",
-        "durationMinutes": 90,
-        "legs": [
-          {
-            "mode": "train",
-            "line": "RE4",
-            "operator": "DB Regio",
-            "from": { "name": "Hamburg Hbf" },
-            "to":   { "name": "Bremen Hbf" },
-            "scheduledDeparture": "2026-01-31T08:06:00+01:00",
-            "realtimeDeparture": "2026-01-31T08:18:00+01:00",
-            "delayMinutes": 12,
-            "scheduledArrival": "2026-01-31T09:21:00+01:00",
-            "realtimeArrival": "2026-01-31T09:36:00+01:00",
-            "status": "DELAYED",
-            "remarks": [
-              "Delay likely impacts arrival time."
-            ]
-          }
-        ]
-      },
-      {
-        "id": "conn_3",
-        "departure": "2026-01-31T08:34:00+01:00",
-        "arrival": "2026-01-31T09:49:00+01:00",
-        "durationMinutes": 75,
-        "legs": [
-          {
-            "mode": "train",
-            "line": "RE4",
-            "operator": "DB Regio",
-            "from": { "name": "Hamburg Hbf" },
-            "to":   { "name": "Bremen Hbf" },
-            "scheduledDeparture": "2026-01-31T08:34:00+01:00",
-            "realtimeDeparture": "2026-01-31T08:34:00+01:00",
-            "scheduledArrival": "2026-01-31T09:49:00+01:00",
-            "realtimeArrival": "2026-01-31T09:49:00+01:00",
-            "status": "ON_TIME"
-          }
-        ]
+        "id": "evt_001",
+        "title": "Team Standup",
+        "startTime": "2026-01-31T10:30:00+01:00",
+        "endTime": "2026-01-31T11:00:00+01:00",
+        "localTime": "10:30",
+        "location": "Bremen Office - Room A",
+        "isAllDay": false
       }
     ],
-    "queryMeta": {
-      "realtimeUsed": true,
-      "generatedAt": "2026-01-31T07:10:05+01:00"
-    }
-  }  
+    "nextMeeting": {
+      "id": "evt_001",
+      "title": "Team Standup",
+      "startTime": "2026-01-31T10:30:00+01:00",
+      "localTime": "10:30"
+    },
+    "hasMeetingsToday": true
+  },
+  "weather": {
+    "currentTemperature": 4,
+    "condition": "rain",
+    "rainStartsAt": "07:00",
+    "hourlyForecast": [
+      { "hour": 7, "precipitation": 2.5, "weatherCode": 61, "temperature": 4 },
+      { "hour": 8, "precipitation": 1.8, "weatherCode": 61, "temperature": 5 },
+      { "hour": 9, "precipitation": 0.3, "weatherCode": 51, "temperature": 6 },
+      { "hour": 10, "precipitation": 0, "weatherCode": 3, "temperature": 7 }
+    ]
+  },
+  "expectedResponse": {
+    "scenario": "User asks about catching earlier train",
+    "sampleUserQuestion": "Can I still catch the earlier train?",
+    "expectedAssistantReply": "You can, but it's a gamble. The safe move is to leave a bit early and take the RE4 at 08:34. It doesn't look like the delays are calming down. For now, stick with the RE4 at 8:34 to keep it reliable and stress-free for the 10:30 meeting."
+  },
+  "queryMeta": {
+    "realtimeUsed": true,
+    "generatedAt": "2026-01-31T07:10:05+01:00"
+  }
+}  
