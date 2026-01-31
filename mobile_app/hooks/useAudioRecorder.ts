@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 import { Audio } from 'expo-av';
 import * as Haptics from 'expo-haptics';
+import { getNextUserTranscription } from '../api/mock';
 
 interface RecordingResult {
   transcription: string;
@@ -106,21 +107,13 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
       // For now, return a mock transcription after a brief delay
       await new Promise(resolve => setTimeout(resolve, 500));
       
-      // Mock transcription - in real implementation, send `uri` to STT service
-      const mockTranscriptions = [
-        "What about the weather later?",
-        "Should I drive instead?",
-        "When does the next train leave?",
-        "Tell me more about the traffic",
-        "What time should I leave?",
-      ];
-      
-      const randomIndex = Math.floor(Math.random() * mockTranscriptions.length);
+      // Get the next scripted user transcription for the demo
+      const transcription = getNextUserTranscription();
       
       setIsProcessing(false);
       
       return {
-        transcription: mockTranscriptions[randomIndex],
+        transcription,
         audioUri: audioUri || '',
       };
 

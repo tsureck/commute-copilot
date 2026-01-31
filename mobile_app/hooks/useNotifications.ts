@@ -8,7 +8,8 @@ import { router } from 'expo-router';
 try {
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
-      shouldShowAlert: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
       shouldPlaySound: true,
       shouldSetBadge: false,
     }),
@@ -51,17 +52,12 @@ export function useNotifications(): UseNotificationsReturn {
         setNotification(notification);
       });
 
-      // Listen for notification taps
+      // Listen for notification taps (logging only - actual handling done in HomeScreen)
       responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
         console.log('📱 [Notification] 👆 Notification TAPPED');
         const data = response.notification.request.content.data;
         console.log('📱 [Notification] Data:', JSON.stringify(data));
-        
-        // Navigate to decision screen if decisionId is present
-        if (data?.decisionId) {
-          console.log('📱 [Notification] Navigating to /decision/' + data.decisionId);
-          router.push(`/decision/${data.decisionId}`);
-        }
+        // Navigation is handled by the HomeScreen's notification listener
       });
       console.log('📱 [Notification] Listeners registered');
     } catch (e) {
@@ -71,10 +67,10 @@ export function useNotifications(): UseNotificationsReturn {
     return () => {
       try {
         if (notificationListener.current) {
-          Notifications.removeNotificationSubscription(notificationListener.current);
+          notificationListener.current.remove();
         }
         if (responseListener.current) {
-          Notifications.removeNotificationSubscription(responseListener.current);
+          responseListener.current.remove();
         }
         console.log('📱 [Notification] Listeners cleaned up');
       } catch (e) {

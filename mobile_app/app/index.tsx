@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   View, 
   Text, 
@@ -11,6 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import * as Notifications from 'expo-notifications';
 import { theme } from '../theme';
 import { 
   UpdateCard,
@@ -20,7 +21,7 @@ import {
   SettingsIcon,
   ModernIcon,
 } from '../components';
-import { useSettings, useAudioRecorder } from '../hooks';
+import { useSettings, useAudioRecorder, useNotifications } from '../hooks';
 import { getDecision, postFollowUp, resetFollowUpCount } from '../api';
 import { AgentDecision, ConversationMessage } from '../types';
 import { generateId } from '../utils';
@@ -31,6 +32,7 @@ type ViewMode = 'widget' | 'expanded';
 export default function HomeScreen() {
   const { settings } = useSettings();
   const audioRecorder = useAudioRecorder();
+  const { requestPermissions } = useNotifications();
   
   const [viewMode, setViewMode] = useState<ViewMode>('widget');
   const [decision, setDecision] = useState<AgentDecision | null>(null);
@@ -61,23 +63,85 @@ export default function HomeScreen() {
     setIsRefreshing(false);
   };
 
-  // Handle confidence button tap - toggles between widget and expanded view
-  const handleConfidencePress = async () => {
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    
-    if (viewMode === 'widget') {
-      // Fetch data from backend and expand
-      const data = await loadDecision();
-      if (data) {
-        setViewMode('expanded');
-      }
-    } else {
-      // Go back to widget view
-      setViewMode('widget');
-      setConversation([]); // Clear conversation when collapsing
-      resetFollowUpCount(); // Reset audio counter for next session
+  // Send a notification with the decision info
+  const sendDecisionNotification = async (data: AgentDecision) => {
+    try {
+      await requestPermissions();
+      
+      // Build notification body combining instruction and reason
+      const body = `${data.recommendation.primaryInstruction}\n\n${data.recommendation.reasonShort}`;
+      
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: `🚆 ${data.recommendation.action}`,
+          subtitle: 'Commute Copilot',
+          body: body,
+          data: {
+            decisionId: data.id,
+            type: 'commute_update',
+            action: 'reasoning',
+          },
+          categoryIdentifier: 'commute_decision',
+        },
+        trigger: null, // Show immediately
+      });
+      
+      // Set up action button for the notification
+      await Notifications.setNotificationCategoryAsync('commute_decision', [
+        {
+          identifier: 'give_reasoning',
+          buttonTitle: 'Give Reasoning!',
+          options: {
+            opensAppToForeground: true,
+          },
+        },
+      ]);
+      
+      console.log('📱 [Notification] Decision notification sent');
+    } catch (e) {
+      console.log('📱 [Notification] Could not send notification:', e);
+      // Continue without notification - not critical
     }
   };
+
+  // Handle confidence button tap in widget - sends notification only
+  const handleWidgetConfidencePress = async () => {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    
+    // Fetch data from backend and send notification
+    const data = await loadDecision();
+    if (data) {
+      await sendDecisionNotification(data);
+    }
+  };
+
+  // Handle confidence button tap in expanded view - goes back to widget
+  const handleExpandedConfidencePress = async () => {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    
+    // Go back to widget view
+    setViewMode('widget');
+    setConversation([]); // Clear conversation when collapsing
+    resetFollowUpCount(); // Reset audio counter for next session
+  };
+
+  // Expand to show decision details (called from notification tap)
+  const expandToDetails = async () => {
+    if (!decision) {
+      await loadDecision();
+    }
+    setViewMode('expanded');
+  };
+
+  // Listen for notification taps to expand the view
+  useEffect(() => {
+    const subscription = Notifications.addNotificationResponseReceivedListener(response => {
+      console.log('📱 [Home] Notification tapped, expanding to details');
+      expandToDetails();
+    });
+
+    return () => subscription.remove();
+  }, []);
 
   const handleMicPress = async () => {
     if (audioRecorder.isRecording) {
@@ -161,10 +225,10 @@ export default function HomeScreen() {
         <Text style={styles.widgetInstruction}>RE4 at 08:34</Text>
         <Text style={styles.widgetSubtext}>No problems with your commute!</Text>
 
-        {/* Confidence Button - Triggers API call */}
+        {/* Confidence Button - Sends notification */}
         <TouchableOpacity
           style={styles.confidenceButton}
-          onPress={handleConfidencePress}
+          onPress={handleWidgetConfidencePress}
           activeOpacity={0.8}
           disabled={isLoading}
         >
@@ -231,7 +295,7 @@ export default function HomeScreen() {
               confidence={decision.uiHints.confidenceIndicator}
               audioUrl={decision.audioUrl}
               autoPlayAudio={settings.autoplayVoice}
-              onConfidencePress={handleConfidencePress}
+              onConfidencePress={handleExpandedConfidencePress}
             />
           </View>
         )}
