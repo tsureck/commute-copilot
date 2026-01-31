@@ -2,22 +2,11 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { theme } from '../theme';
 import { CurrentUpdate, Severity } from '../types';
+import { ModernIcon } from './UpdateIcon';
 
 interface UpdateCardProps {
   update: CurrentUpdate;
 }
-
-const iconMap: Record<string, string> = {
-  rain: '🌧️',
-  sun: '☀️',
-  cloud: '☁️',
-  snow: '❄️',
-  train: '🚆',
-  bus: '🚌',
-  car: '🚗',
-  calendar: '📅',
-  default: '📋',
-};
 
 const severityColors: Record<Severity, string> = {
   high: theme.colors.severityHigh,
@@ -25,24 +14,45 @@ const severityColors: Record<Severity, string> = {
   low: theme.colors.severityLow,
 };
 
+// Weather types use dark blue color
+const weatherTypes = ['weather', 'rain', 'sun', 'cloud', 'snow'];
+
 export function UpdateCard({ update }: UpdateCardProps) {
-  const icon = iconMap[update.icon] || iconMap.default;
+  // Use dark blue for weather, otherwise use severity color
+  const isWeather = weatherTypes.includes(update.type) || weatherTypes.includes(update.icon);
+  const iconColor = isWeather ? theme.colors.iconWeather : severityColors[update.severity];
   const severityColor = severityColors[update.severity];
   
   return (
     <View style={styles.container}>
-      <View style={[styles.severityBar, { backgroundColor: severityColor }]} />
+      {/* Icon with glow effect */}
+      <View style={styles.iconContainer}>
+        <View style={[styles.iconGlow, { backgroundColor: iconColor }]} />
+        <View style={styles.iconWrapper}>
+          <ModernIcon 
+            type={update.icon as any} 
+            size={28} 
+            color={iconColor} 
+          />
+        </View>
+      </View>
+      
+      {/* Content */}
       <View style={styles.content}>
         <View style={styles.header}>
-          <Text style={styles.icon}>{icon}</Text>
           <Text style={styles.title}>{update.title}</Text>
           {update.line && (
-            <View style={styles.lineBadge}>
-              <Text style={styles.lineText}>{update.line}</Text>
+            <View style={[styles.lineBadge, { borderColor: severityColor }]}>
+              <Text style={[styles.lineText, { color: severityColor }]}>{update.line}</Text>
             </View>
           )}
         </View>
         <Text style={styles.message}>{update.message}</Text>
+      </View>
+      
+      {/* Severity indicator dot */}
+      <View style={styles.severityContainer}>
+        <View style={[styles.severityDot, { backgroundColor: severityColor }]} />
       </View>
     </View>
   );
@@ -51,28 +61,40 @@ export function UpdateCard({ update }: UpdateCardProps) {
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: theme.colors.glassBackground,
     borderRadius: theme.borderRadius.lg,
     borderWidth: 1,
     borderColor: theme.colors.glassBorder,
     marginBottom: theme.spacing.sm,
-    overflow: 'hidden',
+    padding: theme.spacing.md,
   },
-  severityBar: {
-    width: 4,
+  iconContainer: {
+    position: 'relative',
+    marginRight: theme.spacing.md,
+  },
+  iconGlow: {
+    position: 'absolute',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    opacity: 0.15,
+    top: -6,
+    left: -6,
+  },
+  iconWrapper: {
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   content: {
     flex: 1,
-    padding: theme.spacing.md,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: theme.spacing.xs,
-  },
-  icon: {
-    fontSize: 18,
-    marginRight: theme.spacing.sm,
   },
   title: {
     fontSize: theme.typography.sm,
@@ -81,19 +103,29 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   lineBadge: {
-    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
     paddingHorizontal: theme.spacing.sm,
     paddingVertical: 2,
     borderRadius: theme.borderRadius.sm,
+    marginLeft: theme.spacing.sm,
   },
   lineText: {
     fontSize: theme.typography.xs,
-    fontWeight: theme.typography.semibold,
-    color: theme.colors.accent,
+    fontWeight: theme.typography.bold,
   },
   message: {
     fontSize: theme.typography.sm,
     color: theme.colors.textSecondary,
     lineHeight: 20,
+  },
+  severityContainer: {
+    marginLeft: theme.spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  severityDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
 });

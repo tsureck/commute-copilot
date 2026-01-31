@@ -40,7 +40,8 @@ export const colors = {
   severityLow: '#4ADE80',
   
   // Icons
-  iconWeather: '#60A5FA',
+  iconWeather: '#3B82F6',  // Dark blue for rain/weather
+  iconRain: '#3B82F6',     // Same dark blue for rain
   iconTrain: '#4ADE80',
   iconTransport: '#4ADE80',
   iconCalendar: '#A78BFA',

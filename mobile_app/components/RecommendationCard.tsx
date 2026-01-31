@@ -2,23 +2,16 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { theme } from '../theme';
 import { Recommendation, ConfidenceIndicator } from '../types';
-import { AnimatedWaveform } from './AnimatedWaveform';
+import { AudioPlayButton } from './AudioPlayButton';
+import { ModernIcon } from './UpdateIcon';
 
 interface RecommendationCardProps {
   recommendation: Recommendation;
   confidence: ConfidenceIndicator;
-  isPlaying: boolean;
-  onPlayAudio: () => void;
+  audioUrl?: string;
+  autoPlayAudio?: boolean;
+  onConfidencePress?: () => void;
 }
-
-const iconMap: Record<string, string> = {
-  train: '🚆',
-  home: '🏠',
-  car: '🚗',
-  bus: '🚌',
-  walk: '🚶',
-  default: '✓',
-};
 
 const confidenceColors: Record<ConfidenceIndicator, string> = {
   high: theme.colors.confidenceHigh,
@@ -26,24 +19,57 @@ const confidenceColors: Record<ConfidenceIndicator, string> = {
   low: theme.colors.confidenceLow,
 };
 
+const confidenceLabels: Record<ConfidenceIndicator, string> = {
+  high: 'High confidence',
+  medium: 'Medium confidence',
+  low: 'Low confidence',
+};
+
 export function RecommendationCard({ 
   recommendation, 
   confidence,
-  isPlaying,
-  onPlayAudio,
+  audioUrl,
+  autoPlayAudio = false,
+  onConfidencePress,
 }: RecommendationCardProps) {
-  const icon = iconMap[recommendation.icon] || iconMap.default;
   const confidenceColor = confidenceColors[confidence];
+  
+  const ConfidenceBadgeContent = (
+    <>
+      <View style={[styles.confidenceDot, { backgroundColor: confidenceColor }]} />
+      <Text style={[styles.confidenceText, { color: confidenceColor }]}>
+        {confidenceLabels[confidence]}
+      </Text>
+    </>
+  );
   
   return (
     <View style={styles.container}>
       {/* Header with action */}
       <View style={styles.header}>
         <View style={styles.actionBadge}>
-          <Text style={styles.actionIcon}>{icon}</Text>
+          <View style={styles.actionIconWrapper}>
+            <ModernIcon 
+              type={recommendation.icon as any || 'default'} 
+              size={20} 
+              color={theme.colors.iconWeather} 
+            />
+          </View>
           <Text style={styles.actionText}>{recommendation.action}</Text>
         </View>
-        <View style={[styles.confidenceDot, { backgroundColor: confidenceColor }]} />
+        {onConfidencePress ? (
+          <TouchableOpacity 
+            style={styles.confidenceBadgeButton}
+            onPress={onConfidencePress}
+            activeOpacity={0.7}
+          >
+            {ConfidenceBadgeContent}
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.confidenceBadge}>
+            {ConfidenceBadgeContent}
+          </View>
+        )}
       </View>
       
       {/* Primary instruction */}
@@ -63,22 +89,14 @@ export function RecommendationCard({
       <Text style={styles.reason}>{recommendation.reasonShort}</Text>
       
       {/* Audio player */}
-      <TouchableOpacity 
-        style={styles.audioButton}
-        onPress={onPlayAudio}
-        activeOpacity={0.7}
-      >
-        <View style={styles.audioLeft}>
-          <AnimatedWaveform 
-            isPlaying={isPlaying} 
-            size="small" 
-            color={theme.colors.accent}
-          />
-        </View>
-        <Text style={styles.audioLabel}>
-          {isPlaying ? 'Playing explanation...' : 'Listen to explanation'}
-        </Text>
-      </TouchableOpacity>
+      {audioUrl && (
+        <AudioPlayButton
+          audioUrl={audioUrl}
+          label="Listen to explanation"
+          size="large"
+          autoPlay={autoPlayAudio}
+        />
+      )}
     </View>
   );
 }
@@ -95,7 +113,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: theme.spacing.md,
+    marginBottom: theme.spacing.lg,
   },
   actionBadge: {
     flexDirection: 'row',
@@ -105,8 +123,7 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing.sm,
     borderRadius: theme.borderRadius.full,
   },
-  actionIcon: {
-    fontSize: 16,
+  actionIconWrapper: {
     marginRight: theme.spacing.sm,
   },
   actionText: {
@@ -114,10 +131,29 @@ const styles = StyleSheet.create({
     fontWeight: theme.typography.semibold,
     color: theme.colors.textPrimary,
   },
+  confidenceBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  confidenceBadgeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.surface,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.borderRadius.full,
+    borderWidth: 1,
+    borderColor: theme.colors.glassBorder,
+  },
   confidenceDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: theme.spacing.xs,
+  },
+  confidenceText: {
+    fontSize: theme.typography.xs,
+    fontWeight: theme.typography.medium,
   },
   primaryInstruction: {
     fontSize: theme.typography.xxl,
@@ -145,19 +181,5 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     lineHeight: 22,
     marginBottom: theme.spacing.lg,
-  },
-  audioButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.lg,
-    padding: theme.spacing.md,
-  },
-  audioLeft: {
-    marginRight: theme.spacing.md,
-  },
-  audioLabel: {
-    fontSize: theme.typography.sm,
-    color: theme.colors.textSecondary,
   },
 });

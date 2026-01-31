@@ -1,5 +1,5 @@
 import { AgentDecision, ConversationMessage, Settings } from '../types';
-import { getMockDecision, getMockAudioUrl, postMockFollowUp, getLatestDecisionId as getMockLatestId } from './mock';
+import { getMockDecision, getMockAudioUrl, postMockFollowUp, getLatestDecisionId as getMockLatestId, resetFollowUpCount as resetMockFollowUpCount } from './mock';
 
 let currentSettings: Settings | null = null;
 
@@ -62,12 +62,43 @@ export async function getAudioUrl(decisionId: string): Promise<string> {
 
 /**
  * Send a follow-up message and get AI response with audio
+ * @param userText - Transcribed text from user
+ * @param userAudioUri - Optional URI to user's recorded audio file
  */
-export async function postFollowUp(userText: string): Promise<ConversationMessage> {
+export async function postFollowUp(
+  userText: string, 
+  userAudioUri?: string
+): Promise<ConversationMessage> {
   if (shouldUseMock()) {
-    return postMockFollowUp(userText);
+    return postMockFollowUp(userText, userAudioUri);
   }
   
+  // For real backend: send audio as multipart form data
+  if (userAudioUri) {
+    const formData = new FormData();
+    formData.append('text', userText);
+    formData.append('audio', {
+      uri: userAudioUri,
+      type: 'audio/m4a',
+      name: 'recording.m4a',
+    } as any);
+    
+    const response = await fetch(`${getBaseUrl()}/agent/followup`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+      body: formData,
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to post follow-up: ${response.status}`);
+    }
+    
+    return response.json();
+  }
+  
+  // Text-only request
   const response = await fetch(`${getBaseUrl()}/agent/followup`, {
     method: 'POST',
     headers: {
@@ -90,6 +121,16 @@ export function getLatestDecisionId(): string {
     return getMockLatestId();
   }
   return 'latest';
+}
+
+/**
+ * Reset the follow-up counter (call when starting fresh)
+ */
+export function resetFollowUpCount(): void {
+  if (shouldUseMock()) {
+    resetMockFollowUpCount();
+  }
+  // For real backend, no action needed as server tracks state
 }
 
 export { getMockDecision, getMockAudioUrl, postMockFollowUp };

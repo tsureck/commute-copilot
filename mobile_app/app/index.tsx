@@ -1,68 +1,57 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   View, 
   Text, 
   StyleSheet, 
   ScrollView, 
-  SafeAreaView,
   RefreshControl,
   ActivityIndicator,
+  TouchableOpacity,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import * as Notifications from 'expo-notifications';
 import { theme } from '../theme';
 import { 
   UpdateCard,
   RecommendationCard,
   ConversationBubble,
   MicButton,
-  Button,
+  SettingsIcon,
+  ModernIcon,
 } from '../components';
-import { useSettings, useAudioPlayer, useAudioRecorder } from '../hooks';
-import { getDecision, postFollowUp } from '../api';
+import { useSettings, useAudioRecorder, useNotifications } from '../hooks';
+import { getDecision, postFollowUp, resetFollowUpCount } from '../api';
 import { AgentDecision, ConversationMessage } from '../types';
 import { generateId } from '../utils';
 
+// View modes
+type ViewMode = 'widget' | 'expanded';
+
 export default function HomeScreen() {
   const { settings } = useSettings();
-  const audioPlayer = useAudioPlayer();
   const audioRecorder = useAudioRecorder();
+  const { requestPermissions } = useNotifications();
   
+  const [viewMode, setViewMode] = useState<ViewMode>('widget');
   const [decision, setDecision] = useState<AgentDecision | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [conversation, setConversation] = useState<ConversationMessage[]>([]);
-  const [playingMessageId, setPlayingMessageId] = useState<string | null>(null);
   
   const scrollViewRef = useRef<ScrollView>(null);
 
-  // Load decision on mount
-  useEffect(() => {
-    loadDecision();
-  }, []);
-
-  // Auto-play voice summary if enabled
-  useEffect(() => {
-    if (decision?.audioUrl && settings.autoplayVoice && !audioPlayer.isLoading) {
-      setPlayingMessageId('recommendation');
-      audioPlayer.load(decision.audioUrl, true);
-    }
-  }, [decision?.audioUrl, settings.autoplayVoice]);
-
-  // Reset playing state when audio stops
-  useEffect(() => {
-    if (!audioPlayer.isPlaying) {
-      setPlayingMessageId(null);
-    }
-  }, [audioPlayer.isPlaying]);
-
   const loadDecision = async () => {
+    setIsLoading(true);
     try {
       const data = await getDecision();
       setDecision(data);
+      return data;
     } catch (error) {
       console.error('Failed to load decision:', error);
+      return null;
     } finally {
       setIsLoading(false);
     }
@@ -74,34 +63,92 @@ export default function HomeScreen() {
     setIsRefreshing(false);
   };
 
-  const handlePlayRecommendationAudio = () => {
-    if (decision?.audioUrl) {
-      if (playingMessageId === 'recommendation' && audioPlayer.isPlaying) {
-        audioPlayer.pause();
-        setPlayingMessageId(null);
-      } else {
-        setPlayingMessageId('recommendation');
-        audioPlayer.load(decision.audioUrl, true);
-      }
+  // Send a notification with the decision info
+  const sendDecisionNotification = async (data: AgentDecision) => {
+    try {
+      await requestPermissions();
+      
+      // Build notification body combining instruction and reason
+      const body = `${data.recommendation.primaryInstruction}\n\n${data.recommendation.reasonShort}`;
+      
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: `🚆 ${data.recommendation.action}`,
+          subtitle: 'Commute Copilot',
+          body: body,
+          data: {
+            decisionId: data.id,
+            type: 'commute_update',
+            action: 'reasoning',
+          },
+          categoryIdentifier: 'commute_decision',
+        },
+        trigger: null, // Show immediately
+      });
+      
+      // Set up action button for the notification
+      await Notifications.setNotificationCategoryAsync('commute_decision', [
+        {
+          identifier: 'give_reasoning',
+          buttonTitle: 'Give Reasoning!',
+          options: {
+            opensAppToForeground: true,
+          },
+        },
+      ]);
+      
+      console.log('📱 [Notification] Decision notification sent');
+    } catch (e) {
+      console.log('📱 [Notification] Could not send notification:', e);
+      // Continue without notification - not critical
     }
   };
 
-  const handlePlayMessageAudio = (messageId: string, audioUrl: string) => {
-    if (playingMessageId === messageId && audioPlayer.isPlaying) {
-      audioPlayer.pause();
-      setPlayingMessageId(null);
-    } else {
-      setPlayingMessageId(messageId);
-      audioPlayer.load(audioUrl, true);
+  // Handle confidence button tap in widget - sends notification only
+  const handleWidgetConfidencePress = async () => {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    
+    // Fetch data from backend and send notification
+    const data = await loadDecision();
+    if (data) {
+      await sendDecisionNotification(data);
     }
   };
+
+  // Handle confidence button tap in expanded view - goes back to widget
+  const handleExpandedConfidencePress = async () => {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    
+    // Go back to widget view
+    setViewMode('widget');
+    setConversation([]); // Clear conversation when collapsing
+    resetFollowUpCount(); // Reset audio counter for next session
+  };
+
+  // Expand to show decision details (called from notification tap)
+  const expandToDetails = async () => {
+    if (!decision) {
+      await loadDecision();
+    }
+    setViewMode('expanded');
+  };
+
+  // Listen for notification taps to expand the view
+  useEffect(() => {
+    const subscription = Notifications.addNotificationResponseReceivedListener(response => {
+      console.log('📱 [Home] Notification tapped, expanding to details');
+      expandToDetails();
+    });
+
+    return () => subscription.remove();
+  }, []);
 
   const handleMicPress = async () => {
     if (audioRecorder.isRecording) {
       // Stop recording and process
-      const transcription = await audioRecorder.stopRecording();
-      if (transcription) {
-        await sendMessage(transcription);
+      const result = await audioRecorder.stopRecording();
+      if (result) {
+        await sendMessage(result.transcription, result.audioUri);
       }
     } else {
       // Start recording
@@ -110,7 +157,7 @@ export default function HomeScreen() {
     }
   };
 
-  const sendMessage = async (text: string) => {
+  const sendMessage = async (text: string, userAudioUri?: string) => {
     setIsSending(true);
     
     // Add user message to conversation
@@ -118,6 +165,7 @@ export default function HomeScreen() {
       id: generateId(),
       role: 'user',
       text,
+      audioUrl: userAudioUri, // Store user's audio too
       created_at: new Date().toISOString(),
     };
     
@@ -129,16 +177,10 @@ export default function HomeScreen() {
     }, 100);
     
     try {
-      // Get AI response
-      const response = await postFollowUp(text);
+      // Get AI response - send audio URI for backend processing
+      const response = await postFollowUp(text, userAudioUri);
       
       setConversation(prev => [...prev, response]);
-      
-      // Auto-play response audio if enabled
-      if (settings.autoplayVoice && response.audioUrl) {
-        setPlayingMessageId(response.id);
-        await audioPlayer.load(response.audioUrl, true);
-      }
       
       // Scroll to bottom again
       setTimeout(() => {
@@ -155,19 +197,57 @@ export default function HomeScreen() {
     router.push('/settings');
   };
 
-  if (isLoading) {
-    return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={theme.colors.accent} />
-          <Text style={styles.loadingText}>Loading your commute...</Text>
+  // Widget View - Simple recommendation display
+  const renderWidgetView = () => (
+    <View style={styles.widgetContainer}>
+      {/* Header */}
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.greeting}>Good morning</Text>
+          <Text style={styles.title}>Commute Copilot</Text>
         </View>
-      </SafeAreaView>
-    );
-  }
+        <TouchableOpacity
+          style={styles.settingsButton}
+          onPress={handleOpenSettings}
+          activeOpacity={0.7}
+        >
+          <SettingsIcon size={24} color={theme.colors.textSecondary} />
+        </TouchableOpacity>
+      </View>
 
-  return (
-    <SafeAreaView style={styles.safeArea}>
+      {/* Widget Card */}
+      <View style={styles.widgetCard}>
+        <View style={styles.widgetIconContainer}>
+          <ModernIcon type="train" size={48} color={theme.colors.iconWeather} />
+        </View>
+        
+        <Text style={styles.widgetAction}>Your Next Train</Text>
+        <Text style={styles.widgetInstruction}>RE4 at 08:34</Text>
+        <Text style={styles.widgetSubtext}>No problems with your commute!</Text>
+
+        {/* Confidence Button - Sends notification */}
+        <TouchableOpacity
+          style={styles.confidenceButton}
+          onPress={handleWidgetConfidencePress}
+          activeOpacity={0.8}
+          disabled={isLoading}
+        >
+          {isLoading ? (
+            <ActivityIndicator size="small" color={theme.colors.textPrimary} />
+          ) : (
+            <>
+              <View style={[styles.confidenceDot, { backgroundColor: theme.colors.confidenceHigh }]} />
+              <Text style={styles.confidenceButtonText}>High confidence</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  // Expanded View - Full decision with all details
+  const renderExpandedView = () => (
+    <>
       <ScrollView
         ref={scrollViewRef}
         style={styles.container}
@@ -184,15 +264,16 @@ export default function HomeScreen() {
         {/* Header */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.greeting}>Good morning</Text>
-            <Text style={styles.title}>Your Commute</Text>
+            <Text style={styles.greeting}>Your Commute</Text>
+            <Text style={styles.title}>Details</Text>
           </View>
-          <Button
-            title="⚙️"
+          <TouchableOpacity
+            style={styles.settingsButton}
             onPress={handleOpenSettings}
-            variant="ghost"
-            size="small"
-          />
+            activeOpacity={0.7}
+          >
+            <SettingsIcon size={24} color={theme.colors.textSecondary} />
+          </TouchableOpacity>
         </View>
 
         {/* Quick Status */}
@@ -212,8 +293,9 @@ export default function HomeScreen() {
             <RecommendationCard
               recommendation={decision.recommendation}
               confidence={decision.uiHints.confidenceIndicator}
-              isPlaying={playingMessageId === 'recommendation' && audioPlayer.isPlaying}
-              onPlayAudio={handlePlayRecommendationAudio}
+              audioUrl={decision.audioUrl}
+              autoPlayAudio={settings.autoplayVoice}
+              onConfidencePress={handleExpandedConfidencePress}
             />
           </View>
         )}
@@ -226,8 +308,6 @@ export default function HomeScreen() {
               <ConversationBubble
                 key={message.id}
                 message={message}
-                isPlaying={playingMessageId === message.id && audioPlayer.isPlaying}
-                onPlayAudio={() => message.audioUrl && handlePlayMessageAudio(message.id, message.audioUrl)}
               />
             ))}
             
@@ -254,6 +334,12 @@ export default function HomeScreen() {
           disabled={isLoading}
         />
       </View>
+    </>
+  );
+
+  return (
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      {viewMode === 'widget' ? renderWidgetView() : renderExpandedView()}
     </SafeAreaView>
   );
 }
@@ -261,7 +347,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: 'transparent',
   },
   container: {
     flex: 1,
@@ -271,21 +357,88 @@ const styles = StyleSheet.create({
     paddingTop: theme.spacing.xl,
     paddingBottom: 160, // Space for mic button
   },
-  loadingContainer: {
+  
+  // Widget View Styles
+  widgetContainer: {
+    flex: 1,
+    paddingHorizontal: theme.spacing.lg,
+    paddingTop: theme.spacing.xl,
+  },
+  widgetCard: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: theme.spacing.xxl,
+    marginTop: -theme.spacing.xxxl, // Offset to center better
   },
-  loadingText: {
-    marginTop: theme.spacing.lg,
+  widgetIconContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: theme.colors.glassBackground,
+    borderWidth: 1,
+    borderColor: theme.colors.glassBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: theme.spacing.xxl,
+  },
+  widgetAction: {
     fontSize: theme.typography.md,
     color: theme.colors.textSecondary,
+    marginBottom: theme.spacing.sm,
   },
+  widgetInstruction: {
+    fontSize: 36,
+    fontWeight: theme.typography.bold,
+    color: theme.colors.textPrimary,
+    textAlign: 'center',
+    marginBottom: theme.spacing.md,
+  },
+  widgetSubtext: {
+    fontSize: theme.typography.sm,
+    color: theme.colors.textTertiary,
+    marginBottom: theme.spacing.xxxl,
+  },
+  confidenceButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.surface,
+    paddingHorizontal: theme.spacing.xl,
+    paddingVertical: theme.spacing.md,
+    borderRadius: theme.borderRadius.full,
+    borderWidth: 1,
+    borderColor: theme.colors.glassBorder,
+    minWidth: 180,
+    justifyContent: 'center',
+  },
+  confidenceDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: theme.spacing.sm,
+  },
+  confidenceButtonText: {
+    fontSize: theme.typography.md,
+    fontWeight: theme.typography.semibold,
+    color: theme.colors.textPrimary,
+  },
+
+  // Header Styles
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: theme.spacing.xxl,
+  },
+  settingsButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: theme.colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: theme.colors.glassBorder,
   },
   greeting: {
     fontSize: theme.typography.md,

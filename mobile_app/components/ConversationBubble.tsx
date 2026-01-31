@@ -1,19 +1,80 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { theme } from '../theme';
 import { ConversationMessage } from '../types';
-import { AnimatedWaveform } from './AnimatedWaveform';
+import { AudioPlayButton } from './AudioPlayButton';
+
+// Modern AI/Copilot icon - abstract waveform/signal shape
+function AiIcon({ size, color }: { size: number; color: string }) {
+  const barWidth = size * 0.12;
+  const gap = size * 0.08;
+  const heights = [0.4, 0.7, 1, 0.7, 0.4];
+  
+  return (
+    <View style={{ 
+      width: size, 
+      height: size, 
+      alignItems: 'center', 
+      justifyContent: 'center',
+      flexDirection: 'row',
+      gap: gap,
+    }}>
+      {heights.map((heightRatio, index) => (
+        <View
+          key={index}
+          style={{
+            width: barWidth,
+            height: size * 0.6 * heightRatio,
+            backgroundColor: color,
+            borderRadius: barWidth / 2,
+          }}
+        />
+      ))}
+    </View>
+  );
+}
+
+// Modern User icon - abstract person silhouette
+function UserIcon({ size, color }: { size: number; color: string }) {
+  return (
+    <View style={{ 
+      width: size, 
+      height: size, 
+      alignItems: 'center', 
+      justifyContent: 'center',
+    }}>
+      {/* Head */}
+      <View
+        style={{
+          width: size * 0.35,
+          height: size * 0.35,
+          borderRadius: size * 0.175,
+          backgroundColor: color,
+          marginBottom: size * 0.05,
+        }}
+      />
+      {/* Body/shoulders */}
+      <View
+        style={{
+          width: size * 0.6,
+          height: size * 0.3,
+          backgroundColor: color,
+          borderTopLeftRadius: size * 0.3,
+          borderTopRightRadius: size * 0.3,
+          borderBottomLeftRadius: size * 0.1,
+          borderBottomRightRadius: size * 0.1,
+        }}
+      />
+    </View>
+  );
+}
 
 interface ConversationBubbleProps {
   message: ConversationMessage;
-  onPlayAudio?: () => void;
-  isPlaying?: boolean;
 }
 
 export function ConversationBubble({ 
   message, 
-  onPlayAudio, 
-  isPlaying = false 
 }: ConversationBubbleProps) {
   const isUser = message.role === 'user';
   
@@ -24,7 +85,7 @@ export function ConversationBubble({
     ]}>
       {!isUser && (
         <View style={styles.assistantAvatar}>
-          <Text style={styles.avatarEmoji}>🤖</Text>
+          <AiIcon size={18} color={theme.colors.iconWeather} />
         </View>
       )}
       
@@ -39,28 +100,22 @@ export function ConversationBubble({
           {message.text}
         </Text>
         
-        {/* Audio button for assistant messages */}
+        {/* Audio button for assistant messages - auto-plays */}
         {message.audioUrl && !isUser && (
-          <TouchableOpacity 
-            style={styles.audioButton}
-            onPress={onPlayAudio}
-            activeOpacity={0.7}
-          >
-            <AnimatedWaveform 
-              isPlaying={isPlaying} 
-              size="small" 
-              color={theme.colors.accent}
+          <View style={styles.audioContainer}>
+            <AudioPlayButton
+              audioUrl={message.audioUrl}
+              label="Listen"
+              size="medium"
+              autoPlay={true}
             />
-            <Text style={styles.audioLabel}>
-              {isPlaying ? 'Playing...' : 'Listen'}
-            </Text>
-          </TouchableOpacity>
+          </View>
         )}
       </View>
       
       {isUser && (
         <View style={styles.userAvatar}>
-          <Text style={styles.avatarEmoji}>👤</Text>
+          <UserIcon size={18} color={theme.colors.textPrimary} />
         </View>
       )}
     </View>
@@ -97,9 +152,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginLeft: theme.spacing.sm,
   },
-  avatarEmoji: {
-    fontSize: 16,
-  },
   bubble: {
     maxWidth: '75%',
     padding: theme.spacing.md,
@@ -125,17 +177,7 @@ const styles = StyleSheet.create({
   assistantText: {
     color: theme.colors.textPrimary,
   },
-  audioButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  audioContainer: {
     marginTop: theme.spacing.md,
-    paddingTop: theme.spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.glassBorder,
-  },
-  audioLabel: {
-    fontSize: theme.typography.sm,
-    color: theme.colors.accent,
-    marginLeft: theme.spacing.sm,
   },
 });
