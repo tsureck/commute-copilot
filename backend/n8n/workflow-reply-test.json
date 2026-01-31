@@ -1,0 +1,323 @@
+{
+  "name": "Commute Copilot - Production",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "user_answer",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "61546fe3-af58-468a-bf4a-cb216e9b953c",
+      "name": "User Answer Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        7216,
+        2384
+      ],
+      "webhookId": "user-answer"
+    },
+    {
+      "parameters": {
+        "jsCode": "// PARSE REQUEST: Extract decisionId and text from incoming request\n// App sends: { decisionId: \"dec_u1_001\", text: \"Can I catch the earlier train?\" }\n\nconst body = $input.first().json.body || $input.first().json;\n\nconst decisionId = body.decisionId;\nconst userText = body.text;\n\nif (!decisionId) {\n  throw new Error('Missing decisionId in request');\n}\n\nif (!userText) {\n  throw new Error('Missing text in request');\n}\n\nreturn {\n  decisionId,\n  userText,\n  receivedAt: new Date().toISOString()\n};"
+      },
+      "id": "ac75b17a-5111-4509-8df9-520e7efd0908",
+      "name": "Parse Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        7440,
+        2384
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// MOCK DECISION DATA: Simulates database query for decision by decisionId\n// Based on use_case_1_example/agent/agent-decision.json\n\nconst decisionId = $('Parse Request').first().json.decisionId;\n\n// Mock decision record (as stored in database)\nconst mockDecision = {\n  id: decisionId,\n  session_token: 'session_mock_test_001',\n  snapshot_id: 'snapshot_mock_test_001',\n  decision: 'WORK_FROM_HOME_TEMPORARILY',\n  confidence: 0.88,\n  current_updates: JSON.stringify([\n    {\n      type: 'weather',\n      icon: 'rain',\n      title: 'Weather update',\n      message: 'Heavy rain for the next 30 minutes',\n      severity: 'medium'\n    },\n    {\n      type: 'transport',\n      icon: 'train',\n      title: 'RE4 status',\n      message: 'The RE4 is cancelled at 07:34 and delayed by 12 minutes at 08:06',\n      severity: 'high',\n      line: 'RE4'\n    }\n  ]),\n  recommendation: JSON.stringify({\n    action: 'Start working from home',\n    primaryInstruction: 'Take the RE4 at 08:34',\n    recommendedDepartureTime: '08:34',\n    icon: 'train',\n    reasonShort: 'Earlier connections are cancelled or delayed.',\n    reasonLong: 'Leaving now would cause waiting time with uncertain arrival. Starting in home office and taking the stable RE4 at 08:34 ensures a reliable commute and arrival before your 10:30 meeting.'\n  }),\n  explanation_short: 'RE4 cancelled. Work from home and take the stable 08:34 connection.',\n  explanation_long: 'Your usual RE4 at 07:34 is cancelled and the following RE4 is delayed. Weather conditions also make waiting unpleasant. Starting in home office and leaving at 08:34 avoids stress and still gets you to Bremen well before your first meeting.',\n  created_at: '2026-01-31T07:15:00.000Z'\n};\n\nreturn mockDecision;"
+      },
+      "id": "8888f1f8-c730-4e30-832d-78d8c8382cc7",
+      "name": "Mock Decision Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        7664,
+        2384
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// MOCK CONTEXT SNAPSHOT: Simulates database query for context snapshot\n// Based on use_case_1_example/db-api/answer.json with 10:30 meeting\n\nconst mockContextSnapshot = {\n  id: 'snapshot_mock_test_001',\n  session_token: 'session_mock_test_001',\n  fetched_at: '2026-01-31T07:10:05+01:00',\n  \n  route: JSON.stringify({\n    from: 'Hamburg Hbf',\n    to: 'Bremen Hbf',\n    preferredLine: 'RE4',\n    fromId: '8002549',\n    toId: '8000050'\n  }),\n  \n  transport: JSON.stringify({\n    connections: [\n      {\n        id: 'conn_1',\n        departure: '2026-01-31T07:34:00+01:00',\n        arrival: '2026-01-31T08:49:00+01:00',\n        durationMinutes: 75,\n        line: 'RE4',\n        operator: 'DB Regio',\n        origin: 'Hamburg Hbf',\n        destination: 'Bremen Hbf',\n        status: 'CANCELLED',\n        delayMinutes: 0,\n        isCancelled: true,\n        remarks: [{ type: 'warning', text: 'Cancelled due to operational disruption.' }]\n      },\n      {\n        id: 'conn_2',\n        departure: '2026-01-31T08:18:00+01:00',\n        arrival: '2026-01-31T09:36:00+01:00',\n        plannedDeparture: '2026-01-31T08:06:00+01:00',\n        plannedArrival: '2026-01-31T09:21:00+01:00',\n        durationMinutes: 90,\n        line: 'RE4',\n        operator: 'DB Regio',\n        origin: 'Hamburg Hbf',\n        destination: 'Bremen Hbf',\n        status: 'DELAYED',\n        delayMinutes: 12,\n        isCancelled: false,\n        remarks: [{ type: 'warning', text: 'Delay likely impacts arrival time.' }]\n      },\n      {\n        id: 'conn_3',\n        departure: '2026-01-31T08:34:00+01:00',\n        arrival: '2026-01-31T09:49:00+01:00',\n        durationMinutes: 75,\n        line: 'RE4',\n        operator: 'DB Regio',\n        origin: 'Hamburg Hbf',\n        destination: 'Bremen Hbf',\n        status: 'ON_TIME',\n        delayMinutes: 0,\n        isCancelled: false,\n        remarks: []\n      }\n    ],\n    summary: {\n      totalConnections: 3,\n      cancelledCount: 1,\n      delayedCount: 1,\n      nextStable: { id: 'conn_3', departure: '2026-01-31T08:34:00+01:00', status: 'ON_TIME' }\n    }\n  }),\n  \n  weather: JSON.stringify({\n    currentTemperature: 4,\n    condition: 'rain',\n    rainStartsAt: '07:00',\n    hourlyForecast: [\n      { hour: 7, precipitation: 2.5, temperature: 4 },\n      { hour: 8, precipitation: 1.8, temperature: 5 },\n      { hour: 9, precipitation: 0.3, temperature: 6 },\n      { hour: 10, precipitation: 0, temperature: 7 }\n    ]\n  }),\n  \n  calendar: JSON.stringify({\n    events: [\n      {\n        id: 'evt_001',\n        title: 'Team Standup',\n        startTime: '2026-01-31T10:30:00+01:00',\n        localTime: '10:30',\n        location: 'Bremen Office - Room A'\n      }\n    ],\n    nextMeeting: {\n      title: 'Team Standup',\n      localTime: '10:30'\n    },\n    hasMeetingsToday: true\n  })\n};\n\nreturn mockContextSnapshot;"
+      },
+      "id": "505490d1-32eb-49ff-826c-4f7076fa651b",
+      "name": "Mock Context Snapshot",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        7888,
+        2384
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// BUILD REPLY PROMPT: Combine user text with stored context for Gemini\n\nconst requestData = $('Parse Request').first().json;\nconst decisionRecord = $('Mock Decision Data').first().json;\nconst contextRecord = $('Mock Context Snapshot').first().json;\n\nconst userText = requestData.userText;\n\n// Parse stored JSON fields\nconst transport = JSON.parse(contextRecord.transport);\nconst weather = JSON.parse(contextRecord.weather);\nconst calendar = JSON.parse(contextRecord.calendar);\nconst originalDecision = {\n  decision: decisionRecord.decision,\n  recommendation: JSON.parse(decisionRecord.recommendation),\n  explanationLong: decisionRecord.explanation_long\n};\n\nconst systemPrompt = `You are a helpful commute assistant for a user traveling from Hamburg to Bremen via RE4 train.\n\nYou have access to the STORED CONTEXT from when the recommendation was made:\n\nTRANSPORT DATA:\n${JSON.stringify(transport, null, 2)}\n\nWEATHER DATA:\n${JSON.stringify(weather, null, 2)}\n\nCALENDAR DATA:\n${JSON.stringify(calendar, null, 2)}\n\nORIGINAL RECOMMENDATION:\n- Decision: ${originalDecision.decision}\n- Recommended departure: ${originalDecision.recommendation.recommendedDepartureTime}\n- Reason: ${originalDecision.recommendation.reasonLong}\n\nINSTRUCTIONS:\n1. Answer the user's question using the stored context data\n2. Be conversational but concise - aim for 2-3 sentences\n3. Always reference specific data (times, delays, weather conditions)\n4. The user has a 10:30 meeting in Bremen - keep this constraint in mind\n5. If the user asks about catching an earlier train, acknowledge it's risky due to delays\n6. Recommend the stable 08:34 connection as the safe choice\n7. Speak in a friendly, reassuring tone\n8. Reply with plain text only - no JSON, no markdown, no formatting`;\n\nconst userPrompt = `User question: \"${userText}\"\n\nProvide a helpful response based on the stored context. Consider the train statuses and the 10:30 meeting constraint.`;\n\nreturn {\n  systemPrompt,\n  userPrompt,\n  userText,\n  decisionId: requestData.decisionId,\n  sessionToken: decisionRecord.session_token\n};"
+      },
+      "id": "b45a750e-cf8b-4681-8280-882a237f860c",
+      "name": "Build Reply Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        8096,
+        2384
+      ]
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-flash",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.5-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "={{ $json.systemPrompt + '\\n\\n' + $json.userPrompt }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {
+          "maxOutputTokens": 512,
+          "temperature": 0.6
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        8272,
+        2384
+      ],
+      "id": "0c6691f8-991e-4c26-9d3e-227d69111c46",
+      "name": "Gemini: Generate Reply",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "9mi7DZL0yaXvYsi1",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Robust Gemini text extraction for n8n\nconst gemini = $input.first().json;\nconst prev = $('Build Reply Prompt').first().json;\n\nfunction get(obj, path) {\n  return path.split('.').reduce((o, k) => (o && o[k] !== undefined ? o[k] : undefined), obj);\n}\n\nlet responseText =\n  gemini?.text ??\n  gemini?.responseText ??\n  gemini?.response ??\n  gemini?.output_text ??\n  get(gemini, 'data.text') ??\n  get(gemini, 'result.text') ??\n  get(gemini, 'candidates.0.content.parts.0.text');\n\n// If parts are multiple, join them\nif (!responseText && gemini?.candidates?.[0]?.content?.parts?.length) {\n  responseText = gemini.candidates[0].content.parts\n    .map(p => p?.text)\n    .filter(Boolean)\n    .join('\\n');\n}\n\n// Last resort: deep search for the first long-ish string\nif (!responseText) {\n  const seen = new Set();\n  const stack = [gemini];\n\n  while (stack.length) {\n    const cur = stack.pop();\n    if (!cur || typeof cur !== 'object') continue;\n    if (seen.has(cur)) continue;\n    seen.add(cur);\n\n    for (const v of Object.values(cur)) {\n      if (typeof v === 'string' && v.trim().length > 40) {\n        responseText = v.trim();\n        stack.length = 0;\n        break;\n      }\n      if (v && typeof v === 'object') stack.push(v);\n    }\n  }\n}\n\nresponseText = (responseText || '').trim();\n\nreturn [\n  {\n    json: {\n      responseText,\n      decisionId: prev.decisionId,\n      sessionToken: prev.sessionToken,\n      // helpful debug fields:\n      _debugGeminiKeys: Object.keys(gemini),\n      _debugHasCandidates: !!gemini?.candidates?.length\n    }\n  }\n];\n"
+      },
+      "id": "7e5520ab-74cb-4279-a55c-7fb8e90df161",
+      "name": "Parse Reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        8592,
+        2384
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// BUILD RESPONSE: Format final response for the mobile app\n// App expects: { id, role, text, created_at }\n\nconst replyData = $input.first().json;\n\nconst response = {\n  id: replyData.decisionId,\n  role: 'assistant',\n  text: replyData.responseText,\n  created_at: new Date().toISOString()\n};\n\nreturn response;"
+      },
+      "id": "1e7d3d54-bd53-4066-8f1c-3ceeb2367406",
+      "name": "Build Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        8768,
+        2384
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "15568497-47e0-4632-9a96-31c7740805e6",
+      "name": "Respond to App",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        8976,
+        2384
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "User Answer Webhook": {
+      "main": [
+        [
+          {
+            "node": "Parse Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Request": {
+      "main": [
+        [
+          {
+            "node": "Mock Decision Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mock Decision Data": {
+      "main": [
+        [
+          {
+            "node": "Mock Context Snapshot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mock Context Snapshot": {
+      "main": [
+        [
+          {
+            "node": "Build Reply Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Reply Prompt": {
+      "main": [
+        [
+          {
+            "node": "Gemini: Generate Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini: Generate Reply": {
+      "main": [
+        [
+          {
+            "node": "Parse Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Reply": {
+      "main": [
+        [
+          {
+            "node": "Build Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to App",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "0f10fd09-c4b0-4740-b3b7-46dfa264b2d4",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "2bf2f974e7edb7c5573acf168f958a5fbf8b262047be91e5cbbd2e1da49a14b1"
+  },
+  "id": "p3EswS5LK0oINGgjDTaz0",
+  "tags": [
+    {
+      "updatedAt": "2026-01-31T16:42:00.241Z",
+      "createdAt": "2026-01-31T16:42:00.241Z",
+      "id": "0GgDUypfblswCykn",
+      "name": "scheduled"
+    },
+    {
+      "updatedAt": "2026-01-31T16:42:00.210Z",
+      "createdAt": "2026-01-31T16:42:00.210Z",
+      "id": "9AQzRiiRrRalWerY",
+      "name": "production"
+    },
+    {
+      "updatedAt": "2026-01-31T14:52:03.593Z",
+      "createdAt": "2026-01-31T14:52:03.593Z",
+      "id": "BpCg1x4YJn7dEodb",
+      "name": "decision-engine"
+    },
+    {
+      "updatedAt": "2026-01-31T16:20:32.893Z",
+      "createdAt": "2026-01-31T16:20:32.893Z",
+      "id": "RUv0F6ppHgjvSoJ0",
+      "name": "demo"
+    },
+    {
+      "updatedAt": "2026-01-31T14:52:03.633Z",
+      "createdAt": "2026-01-31T14:52:03.633Z",
+      "id": "S4FwN7zClarrx3FB",
+      "name": "gemini"
+    },
+    {
+      "updatedAt": "2026-01-31T15:15:23.090Z",
+      "createdAt": "2026-01-31T15:15:23.090Z",
+      "id": "T9OwuAvZnTiFxdns",
+      "name": "demo-mode"
+    },
+    {
+      "updatedAt": "2026-01-31T14:52:03.558Z",
+      "createdAt": "2026-01-31T14:52:03.558Z",
+      "id": "sich4Ayi5lC0KQwo",
+      "name": "commute-copilot"
+    },
+    {
+      "updatedAt": "2026-01-31T15:15:23.129Z",
+      "createdAt": "2026-01-31T15:15:23.129Z",
+      "id": "t7TRtcl5EJPeeRTa",
+      "name": "use-case-1"
+    },
+    {
+      "name": "test",
+      "id": "dXuC6ft1iZ8PygZu",
+      "updatedAt": "2026-01-31T18:45:32.713Z",
+      "createdAt": "2026-01-31T18:45:32.713Z"
+    },
+    {
+      "name": "reply",
+      "id": "BaMAwUrngN6AqFfa",
+      "updatedAt": "2026-01-31T18:45:32.753Z",
+      "createdAt": "2026-01-31T18:45:32.753Z"
+    },
+    {
+      "name": "elevenlabs",
+      "id": "wCh1dcZnc5UdVXhT",
+      "updatedAt": "2026-01-31T18:45:32.789Z",
+      "createdAt": "2026-01-31T18:45:32.789Z"
+    }
+  ]
+}
