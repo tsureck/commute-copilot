@@ -4,10 +4,12 @@ package-lock.json
 yarn.lock
 pnpm-lock.yaml
 
-# Environment
+# Environment (NEVER commit these - LLMs can read them even if gitignored!)
 .env
 .env.local
 .env.*.local
+.env.production
+.env.development
 
 # Build output
 dist/

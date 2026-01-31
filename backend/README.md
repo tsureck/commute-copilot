@@ -76,11 +76,15 @@ cd backend/api
 npm install
 
 # Configure environment
+# ⚠️ SECURITY: If using LLMs, prefer terminal env vars (see SECURITY.md)
 cp .env.example .env
 # Edit .env with your credentials (see below)
 
 # Run in development
 npm run dev
+```
+
+**⚠️ Security Note:** If you're sharing your workspace with LLMs (like Cursor AI), they can read `.env` files even if gitignored. **Recommended:** Use terminal environment variables instead. See [SECURITY.md](api/SECURITY.md) for details.
 
 # Build for production
 npm run build

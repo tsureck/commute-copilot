@@ -18,7 +18,7 @@ Get the backend running in **30 minutes** for your hackathon demo.
 6. Paste and click **Run**
 7. Go to **Settings** → **API** → copy:
    - **Project URL** (e.g. `https://abc123.supabase.co`)
-   - **anon public** key
+   - **anon public** key (also called "Publishable key" - this is what you need!)
 
 ✅ Database ready!
 
@@ -62,6 +62,7 @@ cd backend/api
 npm install
 
 # Create .env file
+# ⚠️ SECURITY: If using LLMs, prefer terminal env vars (see SECURITY.md)
 cp .env.example .env
 ```
 
@@ -77,10 +78,11 @@ N8N_DECISION_WEBHOOK=/abc123def456  # The path after /webhook/
 
 # Paste from Step 1
 SUPABASE_URL=https://abc123.supabase.co
-SUPABASE_KEY=eyJhb...  # anon public key
+SUPABASE_KEY=eyJhb...  # anon public key (Publishable key from Supabase)
 
-# Optional: skip for now
-DATABASE_URL=postgresql://...
+# DATABASE_URL: Only needed for n8n Postgres nodes (optional for now)
+# Get from: Supabase → Settings → Database → Connection string → URI
+# DATABASE_URL=postgresql://postgres:[password]@db.abc123.supabase.co:5432/postgres
 
 # Demo mode OFF (use real APIs)
 DEMO_MODE=false

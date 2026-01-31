@@ -35,13 +35,23 @@ In n8n UI, go to **Credentials** and add:
 
 ### 3. Import Workflows
 
-1. Copy JSON from `workflow-b-ondemand.json`
-2. In n8n: **Workflows** → **Import from File** → paste JSON
-3. Activate the workflow
-4. Copy the webhook URL (e.g. `https://your-n8n.app.n8n.cloud/webhook/abc123`)
-5. Add to your API `.env` as `N8N_WEBHOOK_BASE_URL`
+**Option A: Import JSON file (recommended)**
 
-Repeat for Workflow A (scheduled) and C (reply).
+1. In n8n: Click **Workflows** → **Add Workflow** → **Import from File**
+2. Select `workflow-b-ondemand.json` from this folder
+3. Click **Save**
+4. **Add your Gemini API key**: Go to n8n **Settings** → **Environment Variables** → Add `GEMINI_API_KEY`
+5. Click **Activate** (toggle in top-right)
+6. Click the **Webhook** node → copy the webhook URL (e.g. `https://your-n8n.app.n8n.cloud/webhook/abc123/decision`)
+7. Add to your API `.env` as `N8N_WEBHOOK_BASE_URL` (the base part before `/decision`)
+
+**Option B: Import from URL**
+
+1. In n8n: **Workflows** → **Import from URL**
+2. Paste: `https://raw.githubusercontent.com/YOUR_REPO/backend/n8n/workflow-b-ondemand.json`
+
+**Files available:**
+- `workflow-b-ondemand.json` - On-demand decision with demo mode support
 
 ## Workflow Details
 
@@ -62,20 +72,83 @@ Repeat for Workflow A (scheduled) and C (reply).
 }
 ```
 
-**Steps**:
-1. HTTP Request → transport.rest API (Hamburg → Bremen journeys)
-2. Function → Parse connections to ConnectionsAnswer
-3. HTTP Request → Open-Meteo (Hamburg weather)
-4. Function → Parse weather to weatherForecast
-5. Function → Build AgentInfo (combine transport + weather + userContext)
-6. HTTP Request → Google Gemini API (with prompt from prompts.ts)
-7. Function → Validate and clean Gemini JSON response
-8. Postgres → Store decision in database
+**Demo Mode (default: ON)**
+
+By default, the workflow runs in **demo mode** to avoid API calls:
+- Uses mock transport data (Use Case 1: cancelled RE4 at 07:34, delayed at 08:06, on-time at 08:34)
+- Uses mock weather data (rain)
+- Uses mock calendar data (meeting at 10:30)
+- Returns mock decision (WORK_FROM_HOME_TEMPORARILY)
+- Skips Gemini API call
+
+To switch to live mode, set `DEMO_MODE=false` in n8n Environment Variables.
+
+**Architecture**:
+
+```
+Webhook (POST /decision)
+    │
+    ▼
+Demo Mode? ─────────────────────────────────────┐
+    │ (true)                                    │ (false)
+    ▼                                           ▼
+┌──────────────────┐                   ┌──────────────────┐
+│ Mock Transport   │                   │ Live Transport   │
+│ Mock Weather     │                   │ Live Weather     │
+│ Mock Calendar    │                   │                  │
+└────────┬─────────┘                   └────────┬─────────┘
+         │                                      │
+         ▼                                      ▼
+┌──────────────────────────────────────────────────────┐
+│              CONVERSION LOGIC                        │
+│  • Convert Transport Data → SimplifiedConnections    │
+│  • Convert Weather Data → WeatherForecast            │
+│  • Convert Calendar Data → nextMeetingLocalTime      │
+└──────────────────────┬───────────────────────────────┘
+                       │
+                       ▼
+              ┌────────────────┐
+              │  Build AgentInfo│
+              └────────┬───────┘
+                       │
+                       ▼
+              Skip Gemini? ──────────────────┐
+                  │ (demo)                   │ (live)
+                  ▼                          ▼
+         ┌────────────────┐         ┌────────────────┐
+         │ Mock Decision  │         │ Gemini API     │
+         │ (Use Case 1)   │         │ → Parse        │
+         └────────┬───────┘         └────────┬───────┘
+                  │                          │
+                  └──────────┬───────────────┘
+                             ▼
+                      ┌────────────┐
+                      │  Respond   │
+                      └────────────┘
+```
+
+**Conversion Logic (included in workflow)**:
+
+1. **Convert Transport Data**: Raw transport.rest response → `ConnectionsAnswer` + `SimplifiedConnections`
+2. **Convert Weather Data**: Raw Open-Meteo response → `WeatherForecast` (rainStartsLocalTime, condition)
+3. **Convert Calendar Data**: Raw calendar response → `nextMeetingLocalTime`, `hasMeetingsToday`
+
+**Steps (with conversion)**:
+1. Demo Mode? → Route to mock or live data
+2. Get data (mock or live: transport, weather, calendar)
+3. **Convert Transport Data** → SimplifiedConnections format
+4. **Convert Weather Data** → WeatherForecast format
+5. **Convert Calendar Data** → Meeting time extraction
+6. **Build AgentInfo** → Merge all data sources
+7. Skip Gemini? → Demo returns mock decision, Live calls Gemini
+8. (Live only) Call Gemini API → Parse response
 9. Respond → Return AgentDecision JSON
 
 **Output**: AgentDecision matching contracts.ts
 
-See `workflow-b-ondemand-template.md` for detailed node configuration.
+**Note**: Database storage is not included in the demo workflow. Add Postgres node after step 8 when ready.
+
+See `workflow-b-ondemand-template.md` for additional node configuration details.
 
 ### Workflow A: Scheduled Check (Phase 2)
 
@@ -114,7 +187,9 @@ See `workflow-c-reply-template.md`.
 
 ## Testing
 
-### Test Workflow B (on-demand)
+### Test Workflow B (Demo Mode - Default)
+
+With `DEMO_MODE=true` (default), the workflow returns mock Use Case 1 data without calling any external APIs:
 
 ```bash
 curl -X POST https://your-n8n.app.n8n.cloud/webhook/decision \
@@ -129,14 +204,36 @@ curl -X POST https://your-n8n.app.n8n.cloud/webhook/decision \
   }'
 ```
 
-Expected: JSON response with AgentDecision (decision, currentUpdates, recommendation, etc.)
+**Expected response (Use Case 1 mock decision)**:
+```json
+{
+  "id": "dec_demo_123456",
+  "decision": "WORK_FROM_HOME_TEMPORARILY",
+  "confidence": 0.88,
+  "currentUpdates": [
+    {"type": "weather", "icon": "rain", "title": "Weather update", "message": "Heavy rain for the next 30 minutes", "severity": "medium"},
+    {"type": "transport", "icon": "train", "title": "RE4 status", "message": "The RE4 is cancelled at 07:34 and delayed by 12 minutes at 08:06", "severity": "high", "line": "RE4"}
+  ],
+  "recommendation": {
+    "action": "Start working from home",
+    "primaryInstruction": "Take the RE4 at 08:34",
+    "recommendedDepartureTime": "08:34",
+    ...
+  },
+  "explanationShort": "RE4 cancelled. Work from home and take the stable 08:34 connection.",
+  "_debug": { "mode": "demo", "dataSource": "mock", "geminiCalled": false }
+}
+```
 
-### Test with Demo Mode
+### Switch to Live Mode
 
-Add environment variable in n8n:
-- `DEMO_MODE=true`
+To use real APIs (transport.rest, Open-Meteo, Gemini):
 
-When true, skip transport.rest and use mocked connections from `../use_case_1_example/db-api/answer.json`.
+1. In n8n: **Settings** → **Environment Variables**
+2. Set `DEMO_MODE=false`
+3. Add `GEMINI_API_KEY=your-key`
+
+The workflow will then call live APIs and Gemini for real decision generation.
 
 ## Common Issues
 
