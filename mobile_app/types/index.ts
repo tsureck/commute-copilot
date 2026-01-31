@@ -80,6 +80,12 @@ export interface ChatThread {
   updated_at: string;
 }
 
+// Result from postFollowUp - includes both user transcription and assistant response
+export interface FollowUpResult {
+  userTranscription: string; // The transcribed text from user's audio
+  assistantMessage: ConversationMessage; // The assistant's response
+}
+
 export interface Settings {
   useMockBackend: boolean;
   autoplayVoice: boolean;

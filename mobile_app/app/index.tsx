@@ -165,13 +165,15 @@ export default function HomeScreen() {
     
     setIsSending(true);
     
-    // Add user message to conversation (use mock transcription for display in mock mode)
-    // Generate unique ID for React rendering, but keep decision.id for API context
+    // Create a placeholder user message ID for updating later
+    const userMessageId = generateId();
+    
+    // Add user message to conversation with placeholder text while processing
     const userMessage: ConversationMessage = {
-      id: generateId(), // Unique ID for React list rendering
+      id: userMessageId,
       role: 'user',
-      text: mockTranscription || '[Voice message]', // Display text (mock) or placeholder
-      audioUrl: userAudioUri, // Store user's audio
+      text: 'Transcribing...', // Placeholder while STT processes
+      audioUrl: userAudioUri,
       created_at: new Date().toISOString(),
     };
     
@@ -183,10 +185,20 @@ export default function HomeScreen() {
     }, 100);
     
     try {
-      // Send audio to backend with thread ID
-      const response = await postFollowUp(decision.id, userAudioUri);
+      // Send audio to backend with thread ID - returns both user transcription and assistant response
+      const result = await postFollowUp(decision.id, userAudioUri);
       
-      setConversation(prev => [...prev, response]);
+      // Update user message with real transcription and add assistant response
+      setConversation(prev => {
+        // Update the user message with the real transcription
+        const updated = prev.map(msg => 
+          msg.id === userMessageId 
+            ? { ...msg, text: result.userTranscription }
+            : msg
+        );
+        // Add the assistant's response
+        return [...updated, result.assistantMessage];
+      });
       
       // Scroll to bottom again
       setTimeout(() => {
@@ -194,6 +206,14 @@ export default function HomeScreen() {
       }, 100);
     } catch (error) {
       console.error('Failed to get response:', error);
+      // Update user message to show error
+      setConversation(prev => 
+        prev.map(msg => 
+          msg.id === userMessageId 
+            ? { ...msg, text: '[Failed to transcribe]' }
+            : msg
+        )
+      );
     } finally {
       setIsSending(false);
     }

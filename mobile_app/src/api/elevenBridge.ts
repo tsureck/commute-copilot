@@ -2,7 +2,7 @@
  * Eleven Bridge API client for speech-to-text and text-to-speech.
  */
 
-import { ELEVEN_BRIDGE_BASE_URL } from '../config';
+import { ELEVEN_BRIDGE_BASE_URL, ELEVEN_BRIDGE_API_KEY } from '../config';
 
 // ============================================================================
 // Types
@@ -61,21 +61,41 @@ export async function speechToText(
     audioFormat,
   };
 
-  const response = await fetch(`${ELEVEN_BRIDGE_BASE_URL}/speech_to_text/`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(request),
-  });
+  const url = `${ELEVEN_BRIDGE_BASE_URL}/speech_to_text/`;
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/59bd3cce-388d-48b5-b4f5-0d4b9a6b6bf4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'elevenBridge.ts:speechToText:start',message:'Calling ElevenBridge STT',data:{url,decisionId,audioFormat,audioLength:audio.length},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H5'})}).catch(()=>{});
+  console.log('[ElevenBridge] STT request to:', url);
+  // #endregion
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ detail: 'Unknown error' })) as ErrorResponse;
-    throw new Error(errorData.detail || `Speech-to-text failed: ${response.status}`);
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-Key': ELEVEN_BRIDGE_API_KEY,
+      },
+      body: JSON.stringify(request),
+    });
+
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/59bd3cce-388d-48b5-b4f5-0d4b9a6b6bf4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'elevenBridge.ts:speechToText:response',message:'STT response received',data:{status:response.status,ok:response.ok},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H5'})}).catch(()=>{});
+    console.log('[ElevenBridge] STT response status:', response.status);
+    // #endregion
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ detail: 'Unknown error' })) as ErrorResponse;
+      throw new Error(errorData.detail || `Speech-to-text failed: ${response.status}`);
+    }
+
+    const data = await response.json() as SpeechToTextResponse;
+    return data.text;
+  } catch (error) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/59bd3cce-388d-48b5-b4f5-0d4b9a6b6bf4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'elevenBridge.ts:speechToText:error',message:'STT request failed',data:{error:String(error),url},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H5'})}).catch(()=>{});
+    console.error('[ElevenBridge] STT error:', error, 'URL:', url);
+    // #endregion
+    throw error;
   }
-
-  const data = await response.json() as SpeechToTextResponse;
-  return data.text;
 }
 
 /**
@@ -99,6 +119,7 @@ export async function textToSpeech(
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      'X-API-Key': ELEVEN_BRIDGE_API_KEY,
     },
     body: JSON.stringify(request),
   });
@@ -121,6 +142,9 @@ export async function textToSpeech(
 export async function checkHealth(): Promise<HealthResponse> {
   const response = await fetch(`${ELEVEN_BRIDGE_BASE_URL}/health`, {
     method: 'GET',
+    headers: {
+      'X-API-Key': ELEVEN_BRIDGE_API_KEY,
+    },
   });
 
   if (!response.ok) {
