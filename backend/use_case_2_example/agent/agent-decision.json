@@ -2,5 +2,6 @@
   "decision": "LEAVE_EARLIER_THAN_USUAL",
   "recommendedDepartureTime": "16:34",
   "confidence": 0.92,
-  "explanation": "You have no meetings left today and rain starts at 17:00. Take the RE4 at 16:34 instead of your usual train. This avoids waiting and bad weather."
+  "explanation": "You have no meetings left today and rain starts at 17:00. Take the RE4 at 16:34 instead of your usual train. This avoids waiting and bad weather.",
+  "explanationShort": "Rain at 17:00. Take RE4 at 16:34."
 }

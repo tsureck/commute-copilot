@@ -98,4 +98,6 @@ export interface AgentDecision {
   recommendedDepartureTime: string;
   confidence: number; // 0.0–1.0
   explanation: string;
+  /** Short version for push notifications / small UI */
+  explanationShort: string;
 }

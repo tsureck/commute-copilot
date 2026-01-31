@@ -32,6 +32,7 @@ See [db-api/agent_info.json](db-api/agent_info.json) for the full structure the 
 | `recommendedDepartureTime` | string | Local time `HH:MM` |
 | `confidence` | number | 0.0–1.0 |
 | `explanation` | string | Human-readable reasoning |
+| `explanationShort` | string | Short version for push notifications / small UI |
 
 ---
 
