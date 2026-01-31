@@ -18,24 +18,15 @@ function shouldUseMock(): boolean {
 
 /**
  * Get the current agent decision
+ * NOTE: Always returns mock data - the recommendation screen should always be mocked
+ * Only the chat flow uses real backends (ElevenLabs STT → n8n → ElevenLabs TTS)
  */
 export async function getDecision(): Promise<AgentDecision> {
-  if (shouldUseMock()) {
-    return getMockDecision();
-  }
-  
-  const response = await fetch(`${getBaseUrl()}/agent/decision`, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
-  
-  if (!response.ok) {
-    throw new Error(`Failed to fetch decision: ${response.status}`);
-  }
-  
-  return response.json();
+  // #region agent log
+  console.log('[DEBUG] getDecision called - ALWAYS using mock for recommendation');
+  // #endregion
+  // Always use mock data for the recommendation/decision screen
+  return getMockDecision();
 }
 
 /**
@@ -63,6 +54,8 @@ export async function getAudioUrl(decisionId: string): Promise<string> {
 
 /**
  * Send a follow-up with user audio and get AI response
+ * NOTE: Always returns mock data - the HomeScreen follow-up should always be mocked
+ * The real backend flow (ElevenLabs STT → n8n → ElevenLabs TTS) is only in Chat screen
  * @param threadId - The conversation/decision thread ID
  * @param userAudioUri - URI to user's recorded audio file
  */
@@ -70,50 +63,11 @@ export async function postFollowUp(
   threadId: string, 
   userAudioUri: string
 ): Promise<ConversationMessage> {
-  if (shouldUseMock()) {
-    return postMockFollowUp(threadId, userAudioUri);
-  }
-  
-  // Read audio file as base64
-  const base64Audio = await FileSystem.readAsStringAsync(userAudioUri, {
-    encoding: FileSystem.EncodingType.Base64,
-  });
-  
-  // Build request payload
-  const payload: FollowUpRequest = {
-    id: threadId,
-    audio: base64Audio,
-    audioFormat: 'm4a',
-  };
-  
-  const response = await fetch(`${getBaseUrl()}/agent/followup`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload),
-  });
-  
-  if (!response.ok) {
-    throw new Error(`Failed to post follow-up: ${response.status}`);
-  }
-  
-  const data: FollowUpResponse = await response.json();
-  
-  // Convert response to ConversationMessage format
-  // Save base64 audio to cache and get local URI
-  const audioPath = `${FileSystem.cacheDirectory}response_${Date.now()}.${data.audioFormat}`;
-  await FileSystem.writeAsStringAsync(audioPath, data.audio, {
-    encoding: FileSystem.EncodingType.Base64,
-  });
-  
-  return {
-    id: data.id,
-    role: data.role,
-    text: data.text,
-    audioUrl: audioPath, // Local file URI for playback
-    created_at: data.created_at,
-  };
+  // #region agent log
+  console.log('[DEBUG] postFollowUp called - ALWAYS using mock for HomeScreen');
+  // #endregion
+  // Always use mock data for the HomeScreen follow-up conversation
+  return postMockFollowUp(threadId, userAudioUri);
 }
 
 export function getLatestDecisionId(): string {

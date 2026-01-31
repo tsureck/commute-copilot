@@ -168,8 +168,11 @@ export async function postMockFollowUp(
   const responseIndex = Math.min(followUpCount - 1, mockResponses.length - 1);
   const responseText = mockResponses[responseIndex].text;
   
+  // Generate unique ID for React list rendering (threadId is kept for API context)
+  const uniqueId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  
   return {
-    id: threadId, // Return same thread ID for consistency
+    id: uniqueId, // Unique ID for React rendering
     role: 'assistant',
     text: responseText,
     audioUrl,

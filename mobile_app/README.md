@@ -1,27 +1,70 @@
 # Commute Copilot - Mobile App
 
-A cross-platform mobile application built with Expo (React Native + TypeScript) that serves as your intelligent commute assistant. Features a modern AI copilot aesthetic with dark navy theme, glassy cards, and smooth animations.
+A cross-platform mobile application built with Expo (React Native + TypeScript) that serves as your intelligent commute assistant. Features full voice-to-voice conversation with speech-to-text and text-to-speech via ElevenLabs.
 
 ## Features
 
-- 🏠 **Home Screen**: Quick status overview with train, weather, and traffic updates
-- 📋 **Decision Screen**: Detailed commute recommendations with audio narration
-- 💬 **Chat Screen**: Full conversation interface with AI assistant
-- 🎤 **Voice Input**: Record voice messages (mock STT for demo)
-- 🔔 **Notifications**: Local notifications with deep linking
-- ⚙️ **Settings**: Configure mock/live mode, autoplay, and accessibility options
+- 🎤 **Voice Input**: Record audio messages using the device microphone
+- 📝 **Speech-to-Text**: Transcription via Eleven Bridge (ElevenLabs API)
+- 🤖 **AI Responses**: Intelligent responses from n8n workflow backend
+- 🔊 **Text-to-Speech**: Voice synthesis via Eleven Bridge (Matilda voice)
+- ▶️ **Audio Playback**: Play stored audio responses on demand
+- 🌙 **Modern UI**: Dark theme with glass morphism design elements
+
+## Communication Flow
+
+The app implements the following voice conversation flow:
+
+```
+┌─────────────┐     ┌─────────────────┐     ┌──────────────┐
+│ Mobile App  │────▶│  Eleven Bridge  │────▶│  ElevenLabs  │
+│ (Recording) │     │  /speech_to_    │     │  STT API     │
+│             │     │  text/          │     │              │
+└─────────────┘     └─────────────────┘     └──────────────┘
+       │                    │
+       │            { text: "..." }
+       ▼                    │
+┌─────────────┐             │
+│ Mobile App  │◀────────────┘
+│ (Add User   │
+│  Message)   │
+└─────────────┘
+       │
+       │ POST /user_answer
+       ▼
+┌─────────────┐     ┌─────────────────┐
+│    n8n      │────▶│   Mobile App    │
+│ (Workflow)  │     │   (Display      │
+│             │     │    Response)    │
+└─────────────┘     └─────────────────┘
+       │                    │
+       │            POST /text_to_speech/
+       │                    ▼
+       │            ┌─────────────────┐
+       │            │  Eleven Bridge  │
+       │            │  (TTS via       │
+       │            │   ElevenLabs)   │
+       │            └─────────────────┘
+       │                    │
+       │            { audio: "base64" }
+       │                    │
+       │                    ▼
+       │            ┌─────────────────┐
+       └───────────▶│   Mobile App    │
+                    │   (Store Audio  │
+                    │    for Playback)│
+                    └─────────────────┘
+```
 
 ## Tech Stack
 
-- **Expo** (~52.0.0) - Cross-platform React Native framework
+- **Expo** (~54.0.0) - Cross-platform React Native framework
 - **TypeScript** - Type-safe JavaScript
 - **expo-router** - File-based navigation
 - **expo-av** - Audio playback and recording
-- **expo-notifications** - Local and push notifications
-- **expo-linear-gradient** - Background gradients
+- **expo-file-system** - File system access for base64 audio
 - **expo-haptics** - Tactile feedback
 - **react-native-reanimated** - Smooth animations
-- **@react-native-async-storage/async-storage** - Local data persistence
 
 ## Getting Started
 
@@ -39,12 +82,38 @@ cd mobile_app
 
 # Install dependencies
 npm install
-
-# (Optional) Generate placeholder app icons
-npm run generate-assets
 ```
 
-> **Note**: The app will work without icons during development. For production, replace the placeholder images in `assets/` with proper icons.
+### Configure Backend URLs
+
+Edit `app/chat.tsx` and update the configuration constants:
+
+```typescript
+// Eleven Bridge FastAPI service for speech-to-text and text-to-speech
+const ELEVEN_BRIDGE_BASE_URL = 'http://localhost:8000';
+
+// n8n workflow backend for assistant responses
+const N8N_BASE_URL = 'http://localhost:5678/webhook';
+```
+
+**For physical device testing**, replace `localhost` with your computer's local IP address (e.g., `http://192.168.1.100:8000`).
+
+### Start Backend Services
+
+Make sure the following services are running:
+
+**Eleven Bridge** (port 8000):
+```bash
+cd ../elevenlabs/eleven-bridge
+pip install -r requirements.txt
+python -m app.main
+```
+
+**n8n** (port 5678):
+```bash
+# Start n8n with your workflow configured
+npx n8n start
+```
 
 ### Running the App
 
@@ -60,45 +129,25 @@ Then:
 
 ## Usage Guide
 
-### Testing Notifications
+### Voice Conversation
 
-1. Open the app and navigate to the Home screen
-2. Tap **"Send Test Notification"**
-3. Wait 2 seconds for the notification to appear
-4. Tap the notification to navigate to the Decision screen
-
-> **Note**: On iOS, notifications won't appear if the app is in the foreground. Minimize the app or lock your device to see the notification banner.
-
-### Testing Notification Tap Routing
-
-1. Send a test notification (as above)
-2. If on a physical device, lock the screen or switch to another app
-3. When the notification appears, tap it
-4. The app will open directly to the Decision screen (`/decision/demo-001`)
-
-### Switching Between Mock and Real Backend
-
-1. Navigate to **Settings** (gear icon or "Settings" button on Home)
-2. Toggle **"Use Mock Backend"**:
-   - **ON** (default): Uses simulated data with realistic delays
-   - **OFF**: Connects to the backend URL specified in "Base URL"
-3. When using live mode, ensure your backend implements these endpoints:
-   - `GET /decisions/{decisionId}` - Returns Decision object
-   - `POST /chat` - Accepts `{ thread_id, messages, user_text }`, returns ChatMessage
-
-### Voice Recording
-
-1. On the Decision or Chat screen, tap the **microphone button**
-2. Speak your message
-3. Tap the microphone again to stop recording
-4. In mock mode, a random placeholder transcription is used
-5. The structure supports swapping in a real STT service later
+1. Navigate to the **Chat** screen
+2. **Hold the microphone button** to start recording
+3. Speak your message
+4. **Release the button** to send
+5. Watch the loading states:
+   - "Transcribing..." - Audio being converted to text
+   - "Thinking..." - Waiting for n8n response
+   - "Generating audio..." - TTS being generated
+6. The assistant response appears with a **Play button**
+7. Tap **Play** to hear the audio response
 
 ### Audio Playback
 
-- Audio auto-plays on the Decision screen if **"Autoplay Voice"** is enabled in Settings
-- Tap the play/pause button to control playback
-- Progress bar shows current position
+- Each assistant message has a stored audio response
+- Tap the **▶ Play** button to listen
+- Tap again to **⏹ Stop**
+- Audio can be replayed without regenerating
 
 ## Project Structure
 
@@ -107,59 +156,84 @@ mobile_app/
 ├── app/                    # Expo Router screens
 │   ├── _layout.tsx         # Root layout with navigation config
 │   ├── index.tsx           # Home screen
-│   ├── chat.tsx            # Full chat interface
+│   ├── chat.tsx            # Main voice chat interface ⭐
 │   ├── settings.tsx        # Settings screen
 │   └── decision/
 │       └── [decisionId].tsx # Dynamic decision screen
-├── api/
-│   ├── client.ts           # API client (switches mock/live)
-│   └── mock.ts             # Mock data and responses
-├── components/
-│   ├── AnimatedWaveform.tsx
-│   ├── AudioControls.tsx
-│   ├── Button.tsx
-│   ├── ChatBubble.tsx
-│   ├── ConfidencePill.tsx
-│   ├── ConversationDock.tsx
-│   ├── GlassCard.tsx
-│   ├── QuickReplyChips.tsx
-│   ├── SettingsRow.tsx
-│   ├── StatusPreviewCard.tsx
-│   └── UpdateIcon.tsx
-├── hooks/
-│   ├── useAudioPlayer.ts   # Audio playback hook
-│   ├── useAudioRecorder.ts # Voice recording hook
-│   ├── useChatStorage.ts   # Message persistence
-│   ├── useNotifications.ts # Notification handling
-│   └── useSettings.ts      # App settings
-├── theme/
-│   └── tokens.ts           # Design tokens (colors, spacing, etc.)
-├── types/
-│   └── index.ts            # TypeScript interfaces
-├── assets/                 # App icons and images
-├── app.json                # Expo configuration
-├── package.json
-└── tsconfig.json
+├── src/                    # Modular source code
+│   ├── config.ts           # Base URLs configuration
+│   ├── types.ts            # TypeScript type definitions
+│   ├── api/                # API client modules
+│   │   ├── elevenBridge.ts # Eleven Bridge API
+│   │   ├── n8n.ts          # n8n API
+│   │   └── index.ts        # Exports
+│   ├── audio.ts            # Audio utilities
+│   ├── chatStore.ts        # Chat state management
+│   ├── useAudioRecorder.ts # Recording hook
+│   ├── useAudioPlayer.ts   # Playback hook
+│   └── components/         # New components
+├── components/             # Legacy UI components
+├── hooks/                  # Legacy hooks
+├── api/                    # Legacy API client
+├── theme/                  # Design tokens and theme
+├── types/                  # Legacy type definitions
+└── assets/                 # Static assets
+```
+
+## API Integration
+
+### Eleven Bridge Endpoints
+
+**POST /speech_to_text/**
+```json
+Request:
+{
+  "decisionId": "dec_u1_001",
+  "audio": "base64_encoded_audio",
+  "audioFormat": "m4a"
+}
+
+Response:
+{
+  "text": "transcribed text"
+}
+```
+
+**POST /text_to_speech/**
+```json
+Request:
+{
+  "decisionId": "dec_u1_001",
+  "text": "text to convert"
+}
+
+Response:
+{
+  "audio": "base64_encoded_mp3",
+  "audioFormat": "mp3"
+}
+```
+
+### n8n Endpoint
+
+**POST /user_answer**
+```json
+Request:
+{
+  "decisionId": "dec_u1_001",
+  "text": "user transcribed text"
+}
+
+Response:
+{
+  "id": "dec_u1_001",
+  "role": "assistant",
+  "text": "assistant response",
+  "created_at": "2026-01-31T10:00:00.000Z"
+}
 ```
 
 ## Data Types
-
-### Decision
-
-```typescript
-interface Decision {
-  id: string;
-  title: string;
-  updates: Array<{
-    type: 'weather' | 'train' | 'calendar' | 'traffic';
-    text: string;
-  }>;
-  recommendation: string;
-  confidence: 'high' | 'medium' | 'low';
-  audio_url: string;
-  created_at: string;
-}
-```
 
 ### ChatMessage
 
@@ -168,68 +242,40 @@ interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   text: string;
-  audio_url?: string;
+  audioBase64?: string;  // Base64 MP3 for assistant messages
+  audioFormat?: 'mp3';
   created_at: string;
 }
 ```
 
-## API Endpoints (for Real Backend)
+### LoadingState
 
-When `useMockBackend` is disabled, the app calls:
-
-### GET `/decisions/{decisionId}`
-
-Returns a Decision object.
-
-### POST `/chat`
-
-Request body:
-```json
-{
-  "thread_id": "uuid",
-  "messages": [...previous messages],
-  "user_text": "user's message"
-}
+```typescript
+type LoadingState = 
+  | 'idle'
+  | 'recording'
+  | 'transcribing'  // Sending to Eleven Bridge STT
+  | 'thinking'      // Waiting for n8n response
+  | 'generating'    // Getting TTS from Eleven Bridge
+  | 'error';
 ```
-
-Returns a ChatMessage object.
-
-## Customization
-
-### Theme
-
-Edit `theme/tokens.ts` to customize:
-- Colors (background, accent, text, etc.)
-- Spacing values
-- Border radius
-- Typography sizes
-- Animation durations
-
-### Mock Data
-
-Edit `api/mock.ts` to customize:
-- Sample decisions
-- Assistant responses
-- Audio URLs
-
-## Accessibility
-
-- **Reduce Motion**: Disables animations throughout the app
-- High contrast text on dark background
-- Touch targets sized for accessibility (44px minimum)
-- Screen reader compatible components
 
 ## Troubleshooting
 
-### Notifications not appearing on iOS
+### "Network request failed"
+- Ensure backend services are running
+- Check that URLs in `app/chat.tsx` are correct
+- For physical devices, use your computer's IP instead of `localhost`
+- Check that your firewall allows connections on ports 8000 and 5678
 
-Notifications won't show as banners when the app is in the foreground. Minimize the app or use a different approach for in-app alerts.
+### "Microphone permission not granted"
+- Grant microphone permission when prompted
+- Check device settings if permission was previously denied
 
 ### Audio not playing
-
 - Ensure device is not in silent mode (iOS)
-- Check that the audio URL is accessible
-- Verify network connectivity
+- Check that audio was generated successfully (no TTS errors in console)
+- Verify Eleven Bridge is running and responding
 
 ### Build errors
 

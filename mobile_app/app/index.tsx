@@ -166,8 +166,9 @@ export default function HomeScreen() {
     setIsSending(true);
     
     // Add user message to conversation (use mock transcription for display in mock mode)
+    // Generate unique ID for React rendering, but keep decision.id for API context
     const userMessage: ConversationMessage = {
-      id: decision.id,
+      id: generateId(), // Unique ID for React list rendering
       role: 'user',
       text: mockTranscription || '[Voice message]', // Display text (mock) or placeholder
       audioUrl: userAudioUri, // Store user's audio
