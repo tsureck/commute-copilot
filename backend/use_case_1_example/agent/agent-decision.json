@@ -1,6 +1,6 @@
 {
     "decision": "WORK_FROM_HOME_TEMPORARILY",
-    "recommendedDepartureTimeLocal": "08:34",
+    "recommendedDepartureTime": "08:34",
     "confidence": 0.88,
     "explanation": "Your usual RE4 at 07:34 is cancelled and the next RE4 is delayed. Leaving now creates waiting time with uncertain arrival. Start working from home and take the stable RE4 at 08:34; you still arrive before your 10:30 meeting."
   }

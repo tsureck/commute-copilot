@@ -1,0 +1,9 @@
+{
+  "description": "Allowed decision values returned by the decision agent. Single source of truth for UI and backend.",
+  "decisions": [
+    "WORK_FROM_HOME_TEMPORARILY",
+    "WAIT_AND_LEAVE_LATER",
+    "LEAVE_NOW",
+    "LEAVE_EARLIER_THAN_USUAL"
+  ]
+}
