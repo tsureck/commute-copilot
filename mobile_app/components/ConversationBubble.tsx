@@ -1,19 +1,15 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { theme } from '../theme';
 import { ConversationMessage } from '../types';
-import { AnimatedWaveform } from './AnimatedWaveform';
+import { AudioPlayButton } from './AudioPlayButton';
 
 interface ConversationBubbleProps {
   message: ConversationMessage;
-  onPlayAudio?: () => void;
-  isPlaying?: boolean;
 }
 
 export function ConversationBubble({ 
   message, 
-  onPlayAudio, 
-  isPlaying = false 
 }: ConversationBubbleProps) {
   const isUser = message.role === 'user';
   
@@ -41,20 +37,13 @@ export function ConversationBubble({
         
         {/* Audio button for assistant messages */}
         {message.audioUrl && !isUser && (
-          <TouchableOpacity 
-            style={styles.audioButton}
-            onPress={onPlayAudio}
-            activeOpacity={0.7}
-          >
-            <AnimatedWaveform 
-              isPlaying={isPlaying} 
-              size="small" 
-              color={theme.colors.accent}
+          <View style={styles.audioContainer}>
+            <AudioPlayButton
+              audioUrl={message.audioUrl}
+              label="Listen"
+              size="medium"
             />
-            <Text style={styles.audioLabel}>
-              {isPlaying ? 'Playing...' : 'Listen'}
-            </Text>
-          </TouchableOpacity>
+          </View>
         )}
       </View>
       
@@ -125,17 +114,7 @@ const styles = StyleSheet.create({
   assistantText: {
     color: theme.colors.textPrimary,
   },
-  audioButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  audioContainer: {
     marginTop: theme.spacing.md,
-    paddingTop: theme.spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.glassBorder,
-  },
-  audioLabel: {
-    fontSize: theme.typography.sm,
-    color: theme.colors.accent,
-    marginLeft: theme.spacing.sm,
   },
 });

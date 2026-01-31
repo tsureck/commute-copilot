@@ -69,6 +69,11 @@ export function useAudioPlayer(): UseAudioPlayerReturn {
     if (currentUrlRef.current === url && soundRef.current) {
       // Already loaded, just play if autoplay
       if (autoplay) {
+        // Check if at the end, seek to beginning first
+        const status = await soundRef.current.getStatusAsync();
+        if (status.isLoaded && status.positionMillis >= (status.durationMillis || 0) - 100) {
+          await soundRef.current.setPositionAsync(0);
+        }
         await soundRef.current.playAsync();
       }
       return;
@@ -100,6 +105,11 @@ export function useAudioPlayer(): UseAudioPlayerReturn {
 
   const play = useCallback(async () => {
     if (soundRef.current) {
+      // If at the end, seek to beginning first
+      const status = await soundRef.current.getStatusAsync();
+      if (status.isLoaded && status.positionMillis >= (status.durationMillis || 0) - 100) {
+        await soundRef.current.setPositionAsync(0);
+      }
       await soundRef.current.playAsync();
     }
   }, []);

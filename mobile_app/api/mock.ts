@@ -1,8 +1,51 @@
 import { AgentDecision, ConversationMessage } from '../types';
 import { generateId } from '../utils';
+import { Asset } from 'expo-asset';
 
-// Sample audio URL for AI voice (short sample)
-const AI_AUDIO_URL = 'https://www2.cs.uic.edu/~i101/SoundFiles/BaachOrganConcworksound.mp3';
+// Local audio files for AI voice
+const EXPLANATION_AUDIO = require('../assets/audio/explanation.mp3');
+const FOLLOWUP_FIRST_AUDIO = require('../assets/audio/stay_the_f_inside.mp3');
+const FOLLOWUP_SUBSEQUENT_AUDIO = require('../assets/audio/stay_inside_2.mp3');
+
+// Cache for audio URIs
+const audioCache: Record<string, string> = {};
+
+// Track follow-up count for audio selection
+let followUpCount = 0;
+
+async function loadAudioAsset(audioModule: any, key: string): Promise<string> {
+  if (audioCache[key]) return audioCache[key];
+  
+  try {
+    const asset = Asset.fromModule(audioModule);
+    await asset.downloadAsync();
+    audioCache[key] = asset.localUri || asset.uri;
+    return audioCache[key];
+  } catch (e) {
+    console.error(`Failed to load audio ${key}:`, e);
+    return 'https://www2.cs.uic.edu/~i101/SoundFiles/BaachOrganConcworksound.mp3';
+  }
+}
+
+export async function getExplanationAudioUri(): Promise<string> {
+  return loadAudioAsset(EXPLANATION_AUDIO, 'explanation');
+}
+
+export async function getFollowupAudioUri(): Promise<string> {
+  followUpCount++;
+  if (followUpCount === 1) {
+    // First follow-up: use stay_the_f_inside.mp3
+    return loadAudioAsset(FOLLOWUP_FIRST_AUDIO, 'followup_first');
+  } else {
+    // Subsequent follow-ups: use stay_inside_2.mp3
+    return loadAudioAsset(FOLLOWUP_SUBSEQUENT_AUDIO, 'followup_subsequent');
+  }
+}
+
+// Reset follow-up count (useful for testing)
+export function resetFollowUpCount(): void {
+  followUpCount = 0;
+}
 
 // Simulated delay helper
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -44,7 +87,7 @@ const mockDecision: AgentDecision = {
     playVoiceSummary: true,
     confidenceIndicator: 'high',
   },
-  audioUrl: AI_AUDIO_URL,
+  audioUrl: '', // Will be populated dynamically by getMockDecision()
   created_at: new Date().toISOString(),
 };
 
@@ -69,7 +112,13 @@ const mockResponses = [
  */
 export async function getMockDecision(): Promise<AgentDecision> {
   await delay(600);
-  return { ...mockDecision, id: generateId(), created_at: new Date().toISOString() };
+  const audioUrl = await getExplanationAudioUri();
+  return { 
+    ...mockDecision, 
+    id: generateId(), 
+    audioUrl,
+    created_at: new Date().toISOString() 
+  };
 }
 
 /**
@@ -77,16 +126,22 @@ export async function getMockDecision(): Promise<AgentDecision> {
  */
 export async function getMockAudioUrl(decisionId: string): Promise<string> {
   await delay(300);
-  return AI_AUDIO_URL;
+  return getExplanationAudioUri();
 }
 
 /**
  * Post a follow-up message and get AI response
  */
 export async function postMockFollowUp(
-  userText: string
+  userText: string,
+  userAudioUri?: string
 ): Promise<ConversationMessage> {
   await delay(1000);
+  
+  // Log user audio for backend integration (single log point)
+  if (userAudioUri) {
+    console.log('🎤 [API] User audio URI:', userAudioUri);
+  }
   
   // Pick contextual response
   let responseText = mockResponses[0].text;
@@ -100,11 +155,13 @@ export async function postMockFollowUp(
     responseText = mockResponses[3].text;
   }
   
+  const audioUrl = await getFollowupAudioUri();
+  
   return {
     id: generateId(),
     role: 'assistant',
     text: responseText,
-    audioUrl: AI_AUDIO_URL,
+    audioUrl,
     created_at: new Date().toISOString(),
   };
 }

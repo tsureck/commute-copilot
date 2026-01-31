@@ -1,6 +1,6 @@
 export { GlassCard } from './GlassCard';
 export { AnimatedWaveform } from './AnimatedWaveform';
-export { UpdateIcon } from './UpdateIcon';
+export { UpdateIcon, ModernIcon, SettingsIcon } from './UpdateIcon';
 export { ConfidencePill } from './ConfidencePill';
 export { AudioControls } from './AudioControls';
 export { ChatBubble } from './ChatBubble';
@@ -13,3 +13,4 @@ export { UpdateCard } from './UpdateCard';
 export { RecommendationCard } from './RecommendationCard';
 export { ConversationBubble } from './ConversationBubble';
 export { MicButton } from './MicButton';
+export { AudioPlayButton } from './AudioPlayButton';

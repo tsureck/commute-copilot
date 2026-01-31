@@ -2,13 +2,19 @@ import { useState, useCallback, useRef } from 'react';
 import { Audio } from 'expo-av';
 import * as Haptics from 'expo-haptics';
 
+interface RecordingResult {
+  transcription: string;
+  audioUri: string;
+}
+
 interface UseAudioRecorderReturn {
   isRecording: boolean;
   isProcessing: boolean;
   recordingDuration: number;
   error: string | null;
+  lastAudioUri: string | null;
   startRecording: () => Promise<void>;
-  stopRecording: () => Promise<string | null>;
+  stopRecording: () => Promise<RecordingResult | null>;
   cancelRecording: () => Promise<void>;
 }
 
@@ -17,6 +23,7 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
   const [isProcessing, setIsProcessing] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [lastAudioUri, setLastAudioUri] = useState<string | null>(null);
   
   const recordingRef = useRef<Audio.Recording | null>(null);
   const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -61,7 +68,7 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
     }
   }, []);
 
-  const stopRecording = useCallback(async (): Promise<string | null> => {
+  const stopRecording = useCallback(async (): Promise<RecordingResult | null> => {
     if (!recordingRef.current) return null;
 
     try {
@@ -82,9 +89,14 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
         playsInSilentModeIOS: true,
       });
 
-      const uri = recordingRef.current.getURI();
+      const audioUri = recordingRef.current.getURI();
       recordingRef.current = null;
       setIsRecording(false);
+      
+      // Store the audio URI for backend sending
+      if (audioUri) {
+        setLastAudioUri(audioUri);
+      }
 
       // Haptic feedback
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -106,7 +118,11 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
       const randomIndex = Math.floor(Math.random() * mockTranscriptions.length);
       
       setIsProcessing(false);
-      return mockTranscriptions[randomIndex];
+      
+      return {
+        transcription: mockTranscriptions[randomIndex],
+        audioUri: audioUri || '',
+      };
 
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to stop recording');
@@ -147,6 +163,7 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
     isProcessing,
     recordingDuration,
     error,
+    lastAudioUri,
     startRecording,
     stopRecording,
     cancelRecording,

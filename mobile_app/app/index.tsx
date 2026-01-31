@@ -1,13 +1,14 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { 
   View, 
   Text, 
   StyleSheet, 
   ScrollView, 
-  SafeAreaView,
   RefreshControl,
   ActivityIndicator,
+  TouchableOpacity,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { theme } from '../theme';
@@ -16,16 +17,15 @@ import {
   RecommendationCard,
   ConversationBubble,
   MicButton,
-  Button,
+  SettingsIcon,
 } from '../components';
-import { useSettings, useAudioPlayer, useAudioRecorder } from '../hooks';
+import { useSettings, useAudioRecorder } from '../hooks';
 import { getDecision, postFollowUp } from '../api';
 import { AgentDecision, ConversationMessage } from '../types';
 import { generateId } from '../utils';
 
 export default function HomeScreen() {
   const { settings } = useSettings();
-  const audioPlayer = useAudioPlayer();
   const audioRecorder = useAudioRecorder();
   
   const [decision, setDecision] = useState<AgentDecision | null>(null);
@@ -33,7 +33,6 @@ export default function HomeScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [conversation, setConversation] = useState<ConversationMessage[]>([]);
-  const [playingMessageId, setPlayingMessageId] = useState<string | null>(null);
   
   const scrollViewRef = useRef<ScrollView>(null);
 
@@ -41,21 +40,6 @@ export default function HomeScreen() {
   useEffect(() => {
     loadDecision();
   }, []);
-
-  // Auto-play voice summary if enabled
-  useEffect(() => {
-    if (decision?.audioUrl && settings.autoplayVoice && !audioPlayer.isLoading) {
-      setPlayingMessageId('recommendation');
-      audioPlayer.load(decision.audioUrl, true);
-    }
-  }, [decision?.audioUrl, settings.autoplayVoice]);
-
-  // Reset playing state when audio stops
-  useEffect(() => {
-    if (!audioPlayer.isPlaying) {
-      setPlayingMessageId(null);
-    }
-  }, [audioPlayer.isPlaying]);
 
   const loadDecision = async () => {
     try {
@@ -74,34 +58,12 @@ export default function HomeScreen() {
     setIsRefreshing(false);
   };
 
-  const handlePlayRecommendationAudio = () => {
-    if (decision?.audioUrl) {
-      if (playingMessageId === 'recommendation' && audioPlayer.isPlaying) {
-        audioPlayer.pause();
-        setPlayingMessageId(null);
-      } else {
-        setPlayingMessageId('recommendation');
-        audioPlayer.load(decision.audioUrl, true);
-      }
-    }
-  };
-
-  const handlePlayMessageAudio = (messageId: string, audioUrl: string) => {
-    if (playingMessageId === messageId && audioPlayer.isPlaying) {
-      audioPlayer.pause();
-      setPlayingMessageId(null);
-    } else {
-      setPlayingMessageId(messageId);
-      audioPlayer.load(audioUrl, true);
-    }
-  };
-
   const handleMicPress = async () => {
     if (audioRecorder.isRecording) {
       // Stop recording and process
-      const transcription = await audioRecorder.stopRecording();
-      if (transcription) {
-        await sendMessage(transcription);
+      const result = await audioRecorder.stopRecording();
+      if (result) {
+        await sendMessage(result.transcription, result.audioUri);
       }
     } else {
       // Start recording
@@ -110,7 +72,7 @@ export default function HomeScreen() {
     }
   };
 
-  const sendMessage = async (text: string) => {
+  const sendMessage = async (text: string, userAudioUri?: string) => {
     setIsSending(true);
     
     // Add user message to conversation
@@ -118,6 +80,7 @@ export default function HomeScreen() {
       id: generateId(),
       role: 'user',
       text,
+      audioUrl: userAudioUri, // Store user's audio too
       created_at: new Date().toISOString(),
     };
     
@@ -129,16 +92,10 @@ export default function HomeScreen() {
     }, 100);
     
     try {
-      // Get AI response
-      const response = await postFollowUp(text);
+      // Get AI response - send audio URI for backend processing
+      const response = await postFollowUp(text, userAudioUri);
       
       setConversation(prev => [...prev, response]);
-      
-      // Auto-play response audio if enabled
-      if (settings.autoplayVoice && response.audioUrl) {
-        setPlayingMessageId(response.id);
-        await audioPlayer.load(response.audioUrl, true);
-      }
       
       // Scroll to bottom again
       setTimeout(() => {
@@ -157,7 +114,7 @@ export default function HomeScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={theme.colors.accent} />
           <Text style={styles.loadingText}>Loading your commute...</Text>
@@ -167,7 +124,7 @@ export default function HomeScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <ScrollView
         ref={scrollViewRef}
         style={styles.container}
@@ -187,12 +144,13 @@ export default function HomeScreen() {
             <Text style={styles.greeting}>Good morning</Text>
             <Text style={styles.title}>Your Commute</Text>
           </View>
-          <Button
-            title="⚙️"
+          <TouchableOpacity
+            style={styles.settingsButton}
             onPress={handleOpenSettings}
-            variant="ghost"
-            size="small"
-          />
+            activeOpacity={0.7}
+          >
+            <SettingsIcon size={24} color={theme.colors.textSecondary} />
+          </TouchableOpacity>
         </View>
 
         {/* Quick Status */}
@@ -212,8 +170,8 @@ export default function HomeScreen() {
             <RecommendationCard
               recommendation={decision.recommendation}
               confidence={decision.uiHints.confidenceIndicator}
-              isPlaying={playingMessageId === 'recommendation' && audioPlayer.isPlaying}
-              onPlayAudio={handlePlayRecommendationAudio}
+              audioUrl={decision.audioUrl}
+              autoPlayAudio={settings.autoplayVoice}
             />
           </View>
         )}
@@ -226,8 +184,6 @@ export default function HomeScreen() {
               <ConversationBubble
                 key={message.id}
                 message={message}
-                isPlaying={playingMessageId === message.id && audioPlayer.isPlaying}
-                onPlayAudio={() => message.audioUrl && handlePlayMessageAudio(message.id, message.audioUrl)}
               />
             ))}
             
@@ -261,7 +217,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: 'transparent',
   },
   container: {
     flex: 1,
@@ -286,6 +242,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: theme.spacing.xxl,
+  },
+  settingsButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: theme.colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: theme.colors.glassBorder,
   },
   greeting: {
     fontSize: theme.typography.md,
