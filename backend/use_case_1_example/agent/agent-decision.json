@@ -1,8 +1,40 @@
 {
   "decision": "WORK_FROM_HOME_TEMPORARILY",
-  "recommendedDepartureTime": "08:34",
   "confidence": 0.88,
-  "explanation": "Your usual RE4 at 07:34 is cancelled and the next RE4 is delayed. Leaving now creates waiting time with uncertain arrival. Start working from home and take the stable RE4 at 08:34; you still arrive before your 10:30 meeting.",
-  "explanationShort": "RE4 cancelled. Work from home, take RE4 at 08:34."
+
+  "currentUpdates": [
+    {
+      "type": "weather",
+      "icon": "rain",
+      "title": "Weather update",
+      "message": "Heavy rain for the next 30 minutes",
+      "severity": "medium"
+    },
+    {
+      "type": "transport",
+      "icon": "train",
+      "title": "RE4 status",
+      "message": "The RE4 is cancelled at 07:34 and delayed by 12 minutes at 08:06",
+      "severity": "high",
+      "line": "RE4"
+    }
+  ],
+
+  "recommendation": {
+    "action": "Start working from home",
+    "primaryInstruction": "Take the RE4 at 08:34",
+    "recommendedDepartureTime": "08:34",
+    "icon": "train",
+    "reasonShort": "Earlier connections are cancelled or delayed.",
+    "reasonLong": "Leaving now would cause waiting time with uncertain arrival. Starting in home office and taking the stable RE4 at 08:34 ensures a reliable commute and arrival before your 10:30 meeting."
+  },
+
+  "explanationShort": "RE4 cancelled. Work from home and take the stable 08:34 connection.",
+  "explanationLong": "Your usual RE4 at 07:34 is cancelled and the following RE4 is delayed. Weather conditions also make waiting unpleasant. Starting in home office and leaving at 08:34 avoids stress and still gets you to Bremen well before your first meeting.",
+
+  "uiHints": {
+    "highlightAction": true,
+    "playVoiceSummary": true,
+    "confidenceIndicator": "high"
+  }
 }
-  

@@ -92,12 +92,39 @@ export type DecisionType =
   | "LEAVE_NOW"
   | "LEAVE_EARLIER_THAN_USUAL";
 
+/** Update / status card (weather or transport) for "what changed" */
+export interface CurrentUpdate {
+  type: "weather" | "transport";
+  icon: string; // e.g. "rain", "train"
+  title: string;
+  message: string;
+  severity: "low" | "medium" | "high";
+  line?: string; // for transport, e.g. "RE4"
+}
+
+/** Single recommended action + why */
+export interface Recommendation {
+  action: string; // e.g. "Start working from home"
+  primaryInstruction: string; // e.g. "Take the RE4 at 08:34"
+  recommendedDepartureTime: string; // HH:MM
+  icon: string; // e.g. "train"
+  reasonShort: string;
+  reasonLong: string;
+}
+
+/** Optional UI behavior hints */
+export interface UiHints {
+  highlightAction?: boolean;
+  playVoiceSummary?: boolean;
+  confidenceIndicator?: "low" | "medium" | "high";
+}
+
 export interface AgentDecision {
   decision: DecisionType;
-  /** Local time HH:MM */
-  recommendedDepartureTime: string;
   confidence: number; // 0.0–1.0
-  explanation: string;
-  /** Short version for push notifications / small UI */
-  explanationShort: string;
+  currentUpdates: CurrentUpdate[];
+  recommendation: Recommendation;
+  explanationShort: string; // push notifications / small UI
+  explanationLong: string;
+  uiHints?: UiHints;
 }

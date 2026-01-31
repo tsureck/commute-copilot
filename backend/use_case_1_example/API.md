@@ -6,7 +6,7 @@ TypeScript types for all payloads: [contracts.ts](contracts.ts).
 
 ## Naming
 
-- **`recommendedDepartureTime`**: Local time in `HH:MM`. This is the canonical field name for the recommended departure in the decision response.
+- **`recommendedDepartureTime`**: Local time in `HH:MM`. Lives in **recommendation.recommendedDepartureTime** (and optionally in **recommendation.primaryInstruction** as human text).
 
 ---
 
@@ -29,10 +29,12 @@ See [db-api/agent_info.json](db-api/agent_info.json) for the full structure the 
 | Field | Type | Description |
 |-------|------|-------------|
 | `decision` | string | One of the values in [agent/decision-types.json](agent/decision-types.json) |
-| `recommendedDepartureTime` | string | Local time `HH:MM` |
 | `confidence` | number | 0.0–1.0 |
-| `explanation` | string | Human-readable reasoning |
+| `currentUpdates` | array | List of "what changed" cards (weather, transport): `type`, `icon`, `title`, `message`, `severity` (low/medium/high), optional `line` |
+| `recommendation` | object | Single action: `action`, `primaryInstruction`, `recommendedDepartureTime` (HH:MM), `icon`, `reasonShort`, `reasonLong` |
 | `explanationShort` | string | Short version for push notifications / small UI |
+| `explanationLong` | string | Full human-readable reasoning |
+| `uiHints` | object (optional) | UI behavior: `highlightAction`, `playVoiceSummary`, `confidenceIndicator` (low/medium/high) |
 
 ---
 
