@@ -1,0 +1,3 @@
+# Placeholder to keep assets directory in git
+# Run `npm run generate-assets` to create placeholder icons
+# Replace with actual icons before production build

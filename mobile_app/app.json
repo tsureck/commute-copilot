@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "Commute Copilot",
+    "slug": "commute-copilot",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "commute-copilot",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "splash": {
+      "backgroundColor": "#0A1628"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.commutecopilot.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0A1628"
+      },
+      "package": "com.commutecopilot.app"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-notifications",
+        {
+          "color": "#3B82F6"
+        }
+      ],
+      [
+        "expo-av",
+        {
+          "microphonePermission": "Allow $(PRODUCT_NAME) to access your microphone for voice input."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
