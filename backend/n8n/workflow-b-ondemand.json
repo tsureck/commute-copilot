@@ -1,0 +1,375 @@
+{
+  "name": "Commute Copilot - On-Demand Decision",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "decision",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300],
+      "webhookId": "commute-decision"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "demo-check",
+              "leftValue": "={{ $env.DEMO_MODE || 'true' }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-demo-mode",
+      "name": "Demo Mode?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [470, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// MOCK DATA: Use Case 1 - Morning disruption (cancelled RE4)\n// This simulates the transport.rest API response\n\nconst mockTransportResponse = {\n  journeys: [\n    {\n      legs: [{\n        departure: '2026-01-31T07:34:00+01:00',\n        arrival: '2026-01-31T08:49:00+01:00',\n        plannedDeparture: '2026-01-31T07:34:00+01:00',\n        plannedArrival: '2026-01-31T08:49:00+01:00',\n        cancelled: true,\n        departureDelay: 0,\n        line: { name: 'RE4', operator: { name: 'DB Regio' } },\n        origin: { name: 'Hamburg Hbf' },\n        destination: { name: 'Bremen Hbf' },\n        remarks: [{ text: 'Cancelled due to operational disruption (signal failure).' }]\n      }]\n    },\n    {\n      legs: [{\n        departure: '2026-01-31T08:18:00+01:00',\n        arrival: '2026-01-31T09:36:00+01:00',\n        plannedDeparture: '2026-01-31T08:06:00+01:00',\n        plannedArrival: '2026-01-31T09:21:00+01:00',\n        cancelled: false,\n        departureDelay: 720,\n        line: { name: 'RE4', operator: { name: 'DB Regio' } },\n        origin: { name: 'Hamburg Hbf' },\n        destination: { name: 'Bremen Hbf' },\n        remarks: [{ text: 'Delay likely impacts arrival time.' }]\n      }]\n    },\n    {\n      legs: [{\n        departure: '2026-01-31T08:34:00+01:00',\n        arrival: '2026-01-31T09:49:00+01:00',\n        plannedDeparture: '2026-01-31T08:34:00+01:00',\n        plannedArrival: '2026-01-31T09:49:00+01:00',\n        cancelled: false,\n        departureDelay: 0,\n        line: { name: 'RE4', operator: { name: 'DB Regio' } },\n        origin: { name: 'Hamburg Hbf' },\n        destination: { name: 'Bremen Hbf' },\n        remarks: []\n      }]\n    }\n  ]\n};\n\nreturn mockTransportResponse;"
+      },
+      "id": "mock-transport",
+      "name": "Mock Transport Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [690, 160]
+    },
+    {
+      "parameters": {
+        "jsCode": "// MOCK DATA: Weather for Use Case 1\n// Simulates Open-Meteo API response with rain\n\nconst now = new Date();\nconst mockWeatherResponse = {\n  hourly: {\n    time: [\n      now.toISOString(),\n      new Date(now.getTime() + 3600000).toISOString(),\n      new Date(now.getTime() + 7200000).toISOString(),\n      new Date(now.getTime() + 10800000).toISOString()\n    ],\n    precipitation: [0.5, 0.8, 0.2, 0.0],\n    weathercode: [61, 63, 61, 3]\n  }\n};\n\nreturn mockWeatherResponse;"
+      },
+      "id": "mock-weather",
+      "name": "Mock Weather Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [690, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// MOCK DATA: Calendar for Use Case 1\n// Simulates Google Calendar API response\n\nconst mockCalendarResponse = {\n  events: [\n    {\n      id: 'evt_1',\n      summary: 'Team Standup',\n      start: { dateTime: '2026-01-31T10:30:00+01:00' },\n      end: { dateTime: '2026-01-31T11:00:00+01:00' },\n      location: 'Bremen Office'\n    },\n    {\n      id: 'evt_2',\n      summary: 'Project Review',\n      start: { dateTime: '2026-01-31T14:00:00+01:00' },\n      end: { dateTime: '2026-01-31T15:00:00+01:00' },\n      location: 'Bremen Office'\n    }\n  ]\n};\n\nreturn mockCalendarResponse;"
+      },
+      "id": "mock-calendar",
+      "name": "Mock Calendar Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [690, 440]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://v6.db.transport.rest/journeys",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "from", "value": "8002549" },
+            { "name": "to", "value": "8000050" },
+            { "name": "results", "value": "3" },
+            { "name": "departure", "value": "now" }
+          ]
+        },
+        "options": { "timeout": 10000 }
+      },
+      "id": "http-transport",
+      "name": "Get Train Connections (Live)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [690, 580]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.open-meteo.com/v1/forecast",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "latitude", "value": "53.55" },
+            { "name": "longitude", "value": "9.99" },
+            { "name": "hourly", "value": "precipitation,weathercode" },
+            { "name": "forecast_days", "value": "1" }
+          ]
+        },
+        "options": { "timeout": 5000 }
+      },
+      "id": "http-weather",
+      "name": "Get Weather (Live)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [690, 720]
+    },
+    {
+      "parameters": {
+        "jsCode": "// CONVERSION: Transport API Response → SimplifiedConnections\n// Works with both mock and live data\n\nconst input = $input.first().json;\nconst journeys = input.journeys;\n\nif (!journeys || journeys.length === 0) {\n  throw new Error('No journeys found in transport data');\n}\n\n// Convert to ConnectionsAnswer format (full details)\nconst connectionsAnswer = {\n  connections: journeys.map((journey, i) => {\n    const leg = journey.legs[0];\n    return {\n      id: `conn_${i + 1}`,\n      departure: leg.departure,\n      arrival: leg.arrival,\n      durationMinutes: Math.round((new Date(leg.arrival) - new Date(leg.departure)) / 60000),\n      legs: [{\n        mode: 'train',\n        line: leg.line?.name || 'RE4',\n        operator: leg.line?.operator?.name || 'DB Regio',\n        from: { name: leg.origin?.name || 'Hamburg Hbf' },\n        to: { name: leg.destination?.name || 'Bremen Hbf' },\n        scheduledDeparture: leg.plannedDeparture,\n        realtimeDeparture: leg.departure,\n        scheduledArrival: leg.plannedArrival,\n        realtimeArrival: leg.arrival,\n        status: leg.cancelled ? 'CANCELLED' : (leg.departureDelay > 300 ? 'DELAYED' : 'ON_TIME'),\n        delayMinutes: Math.round((leg.departureDelay || 0) / 60),\n        remarks: leg.remarks?.map(r => r.text) || []\n      }]\n    };\n  }),\n  queryMeta: {\n    realtimeUsed: true,\n    generatedAt: new Date().toISOString()\n  }\n};\n\n// Convert to SimplifiedConnections for AgentInfo\nconst simplifiedConnections = connectionsAnswer.connections.map(c => ({\n  dep: new Date(c.departure).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),\n  arr: new Date(c.arrival).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),\n  line: c.legs[0].line,\n  status: c.legs[0].status,\n  delayMin: c.legs[0].delayMinutes || 0\n}));\n\nreturn {\n  connectionsAnswer,\n  connections: simplifiedConnections\n};"
+      },
+      "id": "convert-transport",
+      "name": "Convert Transport Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [910, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// CONVERSION: Weather API Response → WeatherForecast\n// Works with both mock and live data\n\nconst input = $input.first().json;\nconst hourly = input.hourly;\n\nif (!hourly || !hourly.precipitation) {\n  return { weatherForecast: null };\n}\n\n// Find first hour with significant precipitation (>0.1mm)\nconst rainStartIndex = hourly.precipitation.findIndex((p, i) => i < 6 && p > 0.1);\n\nconst weatherForecast = {\n  rainStartsLocalTime: rainStartIndex >= 0 \n    ? new Date(hourly.time[rainStartIndex]).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })\n    : null,\n  condition: rainStartIndex >= 0 ? 'rain' : 'clear',\n  // Additional details for UI\n  precipitationMm: rainStartIndex >= 0 ? hourly.precipitation[rainStartIndex] : 0,\n  weatherCode: rainStartIndex >= 0 ? hourly.weathercode[rainStartIndex] : hourly.weathercode[0]\n};\n\nreturn { weatherForecast };"
+      },
+      "id": "convert-weather",
+      "name": "Convert Weather Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [910, 340]
+    },
+    {
+      "parameters": {
+        "jsCode": "// CONVERSION: Calendar API Response → nextMeetingLocalTime\n// Works with both mock and live (Google Calendar) data\n\nconst input = $input.first().json;\nconst events = input.events || input.items || [];\n\nif (!events || events.length === 0) {\n  return {\n    nextMeetingLocalTime: null,\n    nextMeetingTitle: null,\n    hasMeetingsToday: false\n  };\n}\n\n// Sort events by start time\nconst sortedEvents = events\n  .filter(e => e.start?.dateTime)\n  .sort((a, b) => new Date(a.start.dateTime) - new Date(b.start.dateTime));\n\nconst nextEvent = sortedEvents[0];\n\nif (!nextEvent) {\n  return {\n    nextMeetingLocalTime: null,\n    nextMeetingTitle: null,\n    hasMeetingsToday: false\n  };\n}\n\nconst meetingTime = new Date(nextEvent.start.dateTime);\n\nreturn {\n  nextMeetingLocalTime: meetingTime.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),\n  nextMeetingTitle: nextEvent.summary || 'Meeting',\n  nextMeetingLocation: nextEvent.location || null,\n  hasMeetingsToday: sortedEvents.length > 0,\n  totalMeetingsToday: sortedEvents.length\n};"
+      },
+      "id": "convert-calendar",
+      "name": "Convert Calendar Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [910, 480]
+    },
+    {
+      "parameters": {
+        "jsCode": "// BUILD: AgentInfo from all converted data sources\n// Merges transport, weather, calendar, and user preferences\n\nconst webhookData = $('Webhook').first().json.body || {};\nconst transportData = $('Convert Transport Data').first().json;\nconst weatherData = $('Convert Weather Data').first().json;\nconst calendarData = $('Convert Calendar Data').first().json;\n\n// Build complete AgentInfo\nconst agentInfo = {\n  timeNow: webhookData.timeNow || new Date().toISOString(),\n  \n  route: webhookData.route || {\n    from: 'Hamburg Hbf',\n    to: 'Bremen Hbf',\n    preferredLine: 'RE4'\n  },\n  \n  // Simplified connections for decision making\n  connections: transportData.connections,\n  \n  // User context (from request or defaults)\n  userContext: {\n    homeOfficeAllowed: webhookData.userContext?.homeOfficeAllowed ?? true,\n    nextMeetingLocalTime: calendarData.nextMeetingLocalTime || webhookData.userContext?.nextMeetingLocalTime || null,\n    avoidWaitingOutdoors: webhookData.userContext?.avoidWaitingOutdoors ?? true\n  },\n  \n  // Weather forecast (optional)\n  weatherForecast: weatherData.weatherForecast?.rainStartsLocalTime ? weatherData.weatherForecast : undefined,\n  \n  // Additional context for better decisions\n  calendarContext: {\n    nextMeetingTitle: calendarData.nextMeetingTitle,\n    hasMeetingsToday: calendarData.hasMeetingsToday,\n    totalMeetingsToday: calendarData.totalMeetingsToday\n  }\n};\n\n// Also pass through the full ConnectionsAnswer for reference\nreturn {\n  agentInfo,\n  connectionsAnswer: transportData.connectionsAnswer\n};"
+      },
+      "id": "build-agentinfo",
+      "name": "Build AgentInfo",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1130, 340]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "skip-gemini-check",
+              "leftValue": "={{ $env.DEMO_MODE || 'true' }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-skip-gemini",
+      "name": "Skip Gemini?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1350, 340]
+    },
+    {
+      "parameters": {
+        "jsCode": "// MOCK DECISION: Use Case 1 response (skip Gemini API)\n// Returns the exact agent-decision.json from use_case_1_example\n\nconst mockDecision = {\n  id: `dec_demo_${Date.now().toString().slice(-6)}`,\n  decision: 'WORK_FROM_HOME_TEMPORARILY',\n  confidence: 0.88,\n  \n  currentUpdates: [\n    {\n      type: 'weather',\n      icon: 'rain',\n      title: 'Weather update',\n      message: 'Heavy rain for the next 30 minutes',\n      severity: 'medium'\n    },\n    {\n      type: 'transport',\n      icon: 'train',\n      title: 'RE4 status',\n      message: 'The RE4 is cancelled at 07:34 and delayed by 12 minutes at 08:06',\n      severity: 'high',\n      line: 'RE4'\n    }\n  ],\n  \n  recommendation: {\n    action: 'Start working from home',\n    primaryInstruction: 'Take the RE4 at 08:34',\n    recommendedDepartureTime: '08:34',\n    icon: 'train',\n    reasonShort: 'Earlier connections are cancelled or delayed.',\n    reasonLong: 'Leaving now would cause waiting time with uncertain arrival. Starting in home office and taking the stable RE4 at 08:34 ensures a reliable commute and arrival before your 10:30 meeting.'\n  },\n  \n  explanationShort: 'RE4 cancelled. Work from home and take the stable 08:34 connection.',\n  explanationLong: 'Your usual RE4 at 07:34 is cancelled and the following RE4 is delayed. Weather conditions also make waiting unpleasant. Starting in home office and leaving at 08:34 avoids stress and still gets you to Bremen well before your first meeting.',\n  \n  uiHints: {\n    highlightAction: true,\n    playVoiceSummary: true,\n    confidenceIndicator: 'high'\n  },\n  \n  // Debug info\n  _debug: {\n    mode: 'demo',\n    dataSource: 'mock',\n    geminiCalled: false\n  }\n};\n\nreturn mockDecision;"
+      },
+      "id": "mock-decision",
+      "name": "Mock Decision (Use Case 1)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1570, 240]
+    },
+    {
+      "parameters": {
+        "jsCode": "// BUILD PROMPT: Prepare Gemini API request\n\nconst agentInfo = $('Build AgentInfo').first().json.agentInfo;\nconst timestamp = Date.now().toString().slice(-6);\n\nconst prompt = `You are a commute decision assistant for Hamburg → Bremen via RE4 train.\n\nROLE: Analyze transport status, weather, and user context. Output ONE recommended action with clear reasoning.\n\nPRINCIPLE: \"This app tells you what to do\" — not just routes or ETAs. Reduce stress, avoid pointless waiting.\n\nDECISION TYPES:\n- WORK_FROM_HOME_TEMPORARILY: First train cancelled/delayed, later one stable, user can work from home\n- WAIT_AND_LEAVE_LATER: Minor delay, worth waiting\n- LEAVE_NOW: Current connection is best option\n- LEAVE_EARLIER_THAN_USUAL: Avoid rain or later disruptions\n\nRULES:\n1. Cancelled trains = heavily penalize (never recommend)\n2. Delays >10min = significant penalty\n3. Rain/bad weather = avoid outdoor waiting\n4. Must arrive before nextMeetingLocalTime\n5. If homeOfficeAllowed=true, prefer WORK_FROM_HOME_TEMPORARILY over waiting at station\n6. Always recommend the STABLE connection, not the fastest\n\nINPUT (AgentInfo):\n${JSON.stringify(agentInfo, null, 2)}\n\nOUTPUT (strict JSON only, no markdown):\n{\n  \"id\": \"dec_${timestamp}\",\n  \"decision\": \"WORK_FROM_HOME_TEMPORARILY|WAIT_AND_LEAVE_LATER|LEAVE_NOW|LEAVE_EARLIER_THAN_USUAL\",\n  \"confidence\": 0.0-1.0,\n  \"currentUpdates\": [{\"type\":\"transport|weather\",\"icon\":\"train|rain\",\"title\":\"...\",\"message\":\"...\",\"severity\":\"low|medium|high\",\"line\":\"RE4\"}],\n  \"recommendation\": {\"action\":\"...\",\"primaryInstruction\":\"...\",\"recommendedDepartureTime\":\"HH:MM\",\"icon\":\"train\",\"reasonShort\":\"...\",\"reasonLong\":\"...\"},\n  \"explanationShort\": \"Push notification text\",\n  \"explanationLong\": \"Full explanation for voice/display\",\n  \"uiHints\": {\"highlightAction\":true,\"playVoiceSummary\":true,\"confidenceIndicator\":\"high|medium|low\"}\n}`;\n\nreturn { prompt };"
+      },
+      "id": "build-prompt",
+      "name": "Build Gemini Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1570, 440]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={{ $env.GEMINI_API_KEY }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": {{ JSON.stringify($json.prompt) }}\n    }]\n  }],\n  \"generationConfig\": {\n    \"responseMimeType\": \"application/json\",\n    \"temperature\": 0.7\n  }\n}",
+        "options": { "timeout": 30000 }
+      },
+      "id": "http-gemini",
+      "name": "Call Gemini API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1790, 440]
+    },
+    {
+      "parameters": {
+        "jsCode": "// PARSE: Gemini API response → AgentDecision\n\nconst geminiResponse = $input.first().json;\n\ntry {\n  const text = geminiResponse.candidates[0].content.parts[0].text;\n  const decision = JSON.parse(text);\n  \n  if (!decision.decision || !decision.recommendation || !decision.explanationShort) {\n    throw new Error('Invalid decision structure from Gemini');\n  }\n  \n  // Add debug info\n  decision._debug = {\n    mode: 'live',\n    dataSource: 'gemini',\n    geminiCalled: true\n  };\n  \n  return decision;\n} catch (error) {\n  console.error('Gemini parse error:', error.message);\n  \n  // Fallback decision\n  return {\n    id: `dec_fallback_${Date.now()}`,\n    decision: 'LEAVE_NOW',\n    confidence: 0.5,\n    currentUpdates: [{\n      type: 'transport',\n      icon: 'train',\n      title: 'Status unavailable',\n      message: 'Could not fetch current status',\n      severity: 'medium'\n    }],\n    recommendation: {\n      action: 'Check manually',\n      primaryInstruction: 'Review transport status on DB app',\n      recommendedDepartureTime: 'now',\n      icon: 'train',\n      reasonShort: 'Unable to generate recommendation',\n      reasonLong: 'The system could not generate a recommendation. Please check the Deutsche Bahn app for current status.'\n    },\n    explanationShort: 'System unavailable. Check DB app.',\n    explanationLong: 'Could not generate decision. Please check transport status manually.',\n    uiHints: { highlightAction: false, playVoiceSummary: false, confidenceIndicator: 'low' },\n    _debug: { mode: 'fallback', error: error.message }\n  };\n}"
+      },
+      "id": "parse-gemini",
+      "name": "Parse Gemini Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2010, 440]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "mergeByFields": {
+          "values": []
+        },
+        "options": {}
+      },
+      "id": "merge-decisions",
+      "name": "Merge Decisions",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [2230, 340]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "respond-webhook",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [2450, 340]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [{ "node": "Demo Mode?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Demo Mode?": {
+      "main": [
+        [
+          { "node": "Mock Transport Data", "type": "main", "index": 0 },
+          { "node": "Mock Weather Data", "type": "main", "index": 0 },
+          { "node": "Mock Calendar Data", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "Get Train Connections (Live)", "type": "main", "index": 0 },
+          { "node": "Get Weather (Live)", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Mock Transport Data": {
+      "main": [
+        [{ "node": "Convert Transport Data", "type": "main", "index": 0 }]
+      ]
+    },
+    "Mock Weather Data": {
+      "main": [
+        [{ "node": "Convert Weather Data", "type": "main", "index": 0 }]
+      ]
+    },
+    "Mock Calendar Data": {
+      "main": [
+        [{ "node": "Convert Calendar Data", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Train Connections (Live)": {
+      "main": [
+        [{ "node": "Convert Transport Data", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Weather (Live)": {
+      "main": [
+        [{ "node": "Convert Weather Data", "type": "main", "index": 0 }]
+      ]
+    },
+    "Convert Transport Data": {
+      "main": [
+        [{ "node": "Build AgentInfo", "type": "main", "index": 0 }]
+      ]
+    },
+    "Convert Weather Data": {
+      "main": [
+        [{ "node": "Build AgentInfo", "type": "main", "index": 0 }]
+      ]
+    },
+    "Convert Calendar Data": {
+      "main": [
+        [{ "node": "Build AgentInfo", "type": "main", "index": 0 }]
+      ]
+    },
+    "Build AgentInfo": {
+      "main": [
+        [{ "node": "Skip Gemini?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Skip Gemini?": {
+      "main": [
+        [{ "node": "Mock Decision (Use Case 1)", "type": "main", "index": 0 }],
+        [{ "node": "Build Gemini Prompt", "type": "main", "index": 0 }]
+      ]
+    },
+    "Mock Decision (Use Case 1)": {
+      "main": [
+        [{ "node": "Merge Decisions", "type": "main", "index": 0 }]
+      ]
+    },
+    "Build Gemini Prompt": {
+      "main": [
+        [{ "node": "Call Gemini API", "type": "main", "index": 0 }]
+      ]
+    },
+    "Call Gemini API": {
+      "main": [
+        [{ "node": "Parse Gemini Response", "type": "main", "index": 0 }]
+      ]
+    },
+    "Parse Gemini Response": {
+      "main": [
+        [{ "node": "Merge Decisions", "type": "main", "index": 0 }]
+      ]
+    },
+    "Merge Decisions": {
+      "main": [
+        [{ "node": "Respond", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "commute-copilot" },
+    { "name": "demo-mode" },
+    { "name": "use-case-1" }
+  ],
+  "triggerCount": 0,
+  "updatedAt": "2026-01-31T12:00:00.000Z",
+  "versionId": "2"
+}
