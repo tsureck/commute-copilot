@@ -120,11 +120,47 @@ export interface UiHints {
 }
 
 export interface AgentDecision {
+  /** Id for push/reply reference; backend sets when creating decision */
+  id?: string;
   decision: DecisionType;
   confidence: number; // 0.0–1.0
   currentUpdates: CurrentUpdate[];
   recommendation: Recommendation;
   explanationShort: string; // push notifications / small UI
-  explanationLong: string;
+  explanationLong: string; // also used for voice when uiHints.playVoiceSummary is true
   uiHints?: UiHints;
+}
+
+// --- Push & reply (backend ↔ frontend) ---
+
+/** Slim payload for push notification and deep link; backend builds from AgentDecision */
+export interface DecisionPushPayload {
+  decisionId: string;
+  decision: DecisionType;
+  explanationShort: string;
+  recommendedDepartureTime: string; // HH:MM
+  title?: string;
+  deepLink?: string; // e.g. app://decision/{decisionId}
+}
+
+/** User reply when plan doesn't work (accept / reject / modify) */
+export type ReplyType = "accept" | "reject" | "modify";
+
+export interface UserReply {
+  decisionId: string;
+  replyType: ReplyType;
+  /** Free text for "modify", e.g. "I want to leave at least two hours later" */
+  userMessage?: string;
+  /** Structured overrides when replyType is "modify" */
+  modifyConstraints?: ModifyConstraints;
+}
+
+/** Structured constraints for modify reply; backend can use with or without userMessage */
+export interface ModifyConstraints {
+  /** e.g. 120 for "at least 2h later" */
+  minDepartureDelayMinutes?: number;
+  /** HH:MM — "I want to leave around this time" */
+  preferredDepartureTime?: string;
+  /** HH:MM — "not before this time" */
+  preferredDepartureAfter?: string;
 }
