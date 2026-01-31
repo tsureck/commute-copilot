@@ -62,6 +62,13 @@ Allowed values for `decision` are listed in [agent/decision-types.json](agent/de
 
 ---
 
-## Use case 2 (future)
+## Use case 2: Leave earlier (weather)
 
-Use case 2 (leave earlier / weather) will extend `agent_info` with optional fields such as `weatherForecast` and `direction` (`"outbound"` | `"return"`). The decision types already include `LEAVE_EARLIER_THAN_USUAL`. Request/answer shapes can be reused for return journeys by swapping from/to.
+Use case 2 (no meetings + rain later → leave earlier) extends `agent_info` with optional fields:
+
+- **`direction`**: `"outbound"` (default) | `"return"` — return journey Bremen → Hamburg.
+- **`weatherForecast`**: `{ rainStartsLocalTime?: string, condition?: string }` — e.g. rain at 17:00.
+
+Decision type: `LEAVE_EARLIER_THAN_USUAL`. Request/answer shapes are unchanged; swap from/to for return.
+
+**Examples:** [../use_case_2_example/](../use_case_2_example/) — [db-api/agent_info.json](../use_case_2_example/db-api/agent_info.json), [agent/agent-decision.json](../use_case_2_example/agent/agent-decision.json).

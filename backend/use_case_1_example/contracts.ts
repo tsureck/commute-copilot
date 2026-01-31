@@ -51,12 +51,23 @@ export interface QueryMeta {
 }
 
 // --- Decision agent input (db-api/agent_info.json) ---
+// Use case 2 extends with optional direction and weatherForecast (use_case_2_example/db-api/agent_info.json)
 
 export interface AgentInfo {
   timeNow: string; // ISO 8601
+  /** Use case 2: "outbound" (default) | "return" */
+  direction?: "outbound" | "return";
   route: { from: string; to: string; preferredLine: string };
   connections: SimplifiedConnection[];
   userContext: UserContext;
+  /** Use case 2: weather for leave-earlier decision */
+  weatherForecast?: WeatherForecast;
+}
+
+export interface WeatherForecast {
+  /** Local time HH:MM when rain (or worsening) starts */
+  rainStartsLocalTime?: string;
+  condition?: string; // e.g. "rain", "clear"
 }
 
 export interface SimplifiedConnection {
