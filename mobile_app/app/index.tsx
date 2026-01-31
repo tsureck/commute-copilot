@@ -159,7 +159,7 @@ export default function HomeScreen() {
         
         <Text style={styles.widgetAction}>Your Next Train</Text>
         <Text style={styles.widgetInstruction}>RE4 at 08:34</Text>
-        <Text style={styles.widgetSubtext}>Tap below to get details</Text>
+        <Text style={styles.widgetSubtext}>No problems with your commute!</Text>
 
         {/* Confidence Button - Triggers API call */}
         <TouchableOpacity
