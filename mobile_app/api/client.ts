@@ -1,5 +1,5 @@
 import { AgentDecision, ConversationMessage, Settings } from '../types';
-import { getMockDecision, getMockAudioUrl, postMockFollowUp, getLatestDecisionId as getMockLatestId } from './mock';
+import { getMockDecision, getMockAudioUrl, postMockFollowUp, getLatestDecisionId as getMockLatestId, resetFollowUpCount as resetMockFollowUpCount } from './mock';
 
 let currentSettings: Settings | null = null;
 
@@ -121,6 +121,16 @@ export function getLatestDecisionId(): string {
     return getMockLatestId();
   }
   return 'latest';
+}
+
+/**
+ * Reset the follow-up counter (call when starting fresh)
+ */
+export function resetFollowUpCount(): void {
+  if (shouldUseMock()) {
+    resetMockFollowUpCount();
+  }
+  // For real backend, no action needed as server tracks state
 }
 
 export { getMockDecision, getMockAudioUrl, postMockFollowUp };

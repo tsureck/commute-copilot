@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { theme } from '../theme';
 import { Recommendation, ConfidenceIndicator } from '../types';
 import { AudioPlayButton } from './AudioPlayButton';
@@ -10,6 +10,7 @@ interface RecommendationCardProps {
   confidence: ConfidenceIndicator;
   audioUrl?: string;
   autoPlayAudio?: boolean;
+  onConfidencePress?: () => void;
 }
 
 const confidenceColors: Record<ConfidenceIndicator, string> = {
@@ -29,8 +30,18 @@ export function RecommendationCard({
   confidence,
   audioUrl,
   autoPlayAudio = false,
+  onConfidencePress,
 }: RecommendationCardProps) {
   const confidenceColor = confidenceColors[confidence];
+  
+  const ConfidenceBadgeContent = (
+    <>
+      <View style={[styles.confidenceDot, { backgroundColor: confidenceColor }]} />
+      <Text style={[styles.confidenceText, { color: confidenceColor }]}>
+        {confidenceLabels[confidence]}
+      </Text>
+    </>
+  );
   
   return (
     <View style={styles.container}>
@@ -46,12 +57,19 @@ export function RecommendationCard({
           </View>
           <Text style={styles.actionText}>{recommendation.action}</Text>
         </View>
-        <View style={styles.confidenceBadge}>
-          <View style={[styles.confidenceDot, { backgroundColor: confidenceColor }]} />
-          <Text style={[styles.confidenceText, { color: confidenceColor }]}>
-            {confidenceLabels[confidence]}
-          </Text>
-        </View>
+        {onConfidencePress ? (
+          <TouchableOpacity 
+            style={styles.confidenceBadgeButton}
+            onPress={onConfidencePress}
+            activeOpacity={0.7}
+          >
+            {ConfidenceBadgeContent}
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.confidenceBadge}>
+            {ConfidenceBadgeContent}
+          </View>
+        )}
       </View>
       
       {/* Primary instruction */}
@@ -116,6 +134,16 @@ const styles = StyleSheet.create({
   confidenceBadge: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  confidenceBadgeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.surface,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.borderRadius.full,
+    borderWidth: 1,
+    borderColor: theme.colors.glassBorder,
   },
   confidenceDot: {
     width: 8,
