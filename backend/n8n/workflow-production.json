@@ -1,0 +1,797 @@
+{
+  "name": "Commute Copilot - Production",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes"
+            }
+          ]
+        }
+      },
+      "id": "2936f055-a860-4bb2-a53c-8ec5f1e23796",
+      "name": "Every 5 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [400, 992]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "reply",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "ff233c8e-8cd8-49c9-98f4-7a00820597e2",
+      "name": "User Reply Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [400, 1392],
+      "webhookId": "commute-reply"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "time-check",
+              "leftValue": "={{ new Date().getHours() }}",
+              "rightValue": "6",
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            },
+            {
+              "id": "time-check-2",
+              "leftValue": "={{ new Date().getHours() }}",
+              "rightValue": "10",
+              "operator": {
+                "type": "number",
+                "operation": "lte"
+              }
+            },
+            {
+              "id": "weekday-check",
+              "leftValue": "={{ new Date().getDay() }}",
+              "rightValue": "0",
+              "operator": {
+                "type": "number",
+                "operation": "notEquals"
+              }
+            },
+            {
+              "id": "weekday-check-2",
+              "leftValue": "={{ new Date().getDay() }}",
+              "rightValue": "6",
+              "operator": {
+                "type": "number",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "2674de09-571f-481e-aa9b-a18fd3fa7a20",
+      "name": "Is Commute Time?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [624, 992]
+    },
+    {
+      "parameters": {
+        "url": "https://v6.db.transport.rest/journeys",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "from", "value": "8002549" },
+            { "name": "to", "value": "8000050" },
+            { "name": "results", "value": "5" },
+            { "name": "departure", "value": "now" },
+            { "name": "stopovers", "value": "false" },
+            { "name": "remarks", "value": "true" }
+          ]
+        },
+        "options": {
+          "response": { "response": {} },
+          "timeout": 15000
+        }
+      },
+      "id": "bffd4f57-54ea-410e-889b-a5f4e6cc0b4e",
+      "name": "Fetch Train Connections",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [832, 864]
+    },
+    {
+      "parameters": {
+        "url": "https://api.open-meteo.com/v1/forecast",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "latitude", "value": "53.5511" },
+            { "name": "longitude", "value": "9.9937" },
+            { "name": "hourly", "value": "precipitation,weathercode,temperature_2m" },
+            { "name": "forecast_days", "value": "1" },
+            { "name": "timezone", "value": "Europe/Berlin" }
+          ]
+        },
+        "options": { "timeout": 10000 }
+      },
+      "id": "5fe54461-31bb-490f-965b-b6ff3ceec697",
+      "name": "Fetch Weather",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [832, 992]
+    },
+    {
+      "parameters": {
+        "operation": "getMany",
+        "calendar": {
+          "__rl": true,
+          "value": "primary",
+          "mode": "list"
+        }
+      },
+      "id": "18746674-7df9-4a1f-9daf-190db0880c44",
+      "name": "Fetch Calendar Events",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.2,
+      "position": [832, 1136]
+    },
+    {
+      "parameters": {
+        "jsCode": "// TRANSFORM & PREPARE: Convert raw API data to structured context\n// This context will be stored in DB for LLM reasoning\n\nconst transportData = $('Fetch Train Connections').first().json;\nconst weatherData = $('Fetch Weather').first().json;\nconst calendarData = $('Fetch Calendar Events').all();\n\nconst sessionToken = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;\nconst snapshotId = `snapshot_${Date.now()}`;\n\n// Parse transport connections with full details\nconst connections = (transportData.journeys || []).map((journey, i) => {\n  const leg = journey.legs?.[0] || {};\n  const isCancelled = leg.cancelled === true;\n  const delaySeconds = leg.departureDelay || 0;\n  const delayMinutes = Math.round(delaySeconds / 60);\n  \n  let status = 'ON_TIME';\n  if (isCancelled) status = 'CANCELLED';\n  else if (delayMinutes >= 10) status = 'DELAYED';\n  else if (delayMinutes > 0) status = 'MINOR_DELAY';\n  \n  return {\n    id: `conn_${i + 1}`,\n    departure: leg.departure,\n    arrival: leg.arrival,\n    plannedDeparture: leg.plannedDeparture,\n    plannedArrival: leg.plannedArrival,\n    line: leg.line?.name || 'RE4',\n    operator: leg.line?.operator?.name || 'DB Regio',\n    origin: leg.origin?.name || 'Hamburg Hbf',\n    destination: leg.destination?.name || 'Bremen Hbf',\n    status,\n    delayMinutes,\n    isCancelled,\n    platform: leg.departurePlatform || null,\n    remarks: (leg.remarks || []).map(r => ({ type: r.type, text: r.text }))\n  };\n});\n\n// Parse weather with hourly breakdown\nconst hourly = weatherData.hourly || {};\nconst currentHour = new Date().getHours();\nconst weatherHourly = [];\n\nfor (let i = currentHour; i < Math.min(currentHour + 6, (hourly.time || []).length); i++) {\n  weatherHourly.push({\n    hour: i,\n    time: hourly.time?.[i],\n    precipitation: hourly.precipitation?.[i] || 0,\n    weatherCode: hourly.weathercode?.[i],\n    temperature: hourly.temperature_2m?.[i]\n  });\n}\n\nconst hasRain = weatherHourly.some(h => h.precipitation > 0.5);\nconst rainStartHour = weatherHourly.find(h => h.precipitation > 0.5);\n\nconst weatherContext = {\n  currentTemperature: hourly.temperature_2m?.[currentHour],\n  condition: hasRain ? 'rain' : 'clear',\n  rainStartsAt: rainStartHour ? `${String(rainStartHour.hour).padStart(2, '0')}:00` : null,\n  hourlyForecast: weatherHourly\n};\n\n// Parse calendar events\nconst events = calendarData.map(item => {\n  const event = item.json;\n  const startTime = event.start?.dateTime || event.start?.date;\n  return {\n    id: event.id,\n    title: event.summary || 'Meeting',\n    startTime,\n    endTime: event.end?.dateTime || event.end?.date,\n    localTime: startTime ? new Date(startTime).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : null,\n    location: event.location || null,\n    isAllDay: !event.start?.dateTime\n  };\n}).filter(e => !e.isAllDay);\n\nconst nextMeeting = events[0] || null;\n\n// Detect disruptions\nconst hasDisruption = connections.some(c => c.isCancelled || c.delayMinutes >= 10);\n\n// Build complete context snapshot (stored in DB)\nconst contextSnapshot = {\n  id: snapshotId,\n  sessionToken,\n  fetchedAt: new Date().toISOString(),\n  \n  route: {\n    from: 'Hamburg Hbf',\n    to: 'Bremen Hbf',\n    preferredLine: 'RE4',\n    fromId: '8002549',\n    toId: '8000050'\n  },\n  \n  transport: {\n    connections,\n    summary: {\n      totalConnections: connections.length,\n      cancelledCount: connections.filter(c => c.isCancelled).length,\n      delayedCount: connections.filter(c => c.delayMinutes >= 10).length,\n      nextAvailable: connections.find(c => !c.isCancelled),\n      nextStable: connections.find(c => !c.isCancelled && c.delayMinutes < 5)\n    }\n  },\n  \n  weather: weatherContext,\n  \n  calendar: {\n    events,\n    nextMeeting,\n    hasMeetingsToday: events.length > 0\n  },\n  \n  userPreferences: {\n    homeOfficeAllowed: true,\n    avoidWaitingOutdoors: hasRain,\n    preferredArrivalBuffer: 30\n  },\n  \n  analysis: {\n    hasDisruption,\n    hasCancellation: connections.some(c => c.isCancelled),\n    hasSignificantDelay: connections.some(c => c.delayMinutes >= 10),\n    hasRain,\n    urgency: hasDisruption ? 'high' : (hasRain ? 'medium' : 'low')\n  }\n};\n\nreturn { contextSnapshot };"
+      },
+      "id": "a3cdfd04-cd68-4e79-adc3-0b07bd719b27",
+      "name": "Build Context Snapshot",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1056, 992]
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "value": "public",
+          "mode": "list"
+        },
+        "table": {
+          "__rl": true,
+          "value": "context_snapshots",
+          "mode": "list"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.contextSnapshot.id }}",
+            "session_token": "={{ $json.contextSnapshot.sessionToken }}",
+            "fetched_at": "={{ $json.contextSnapshot.fetchedAt }}",
+            "route": "={{ JSON.stringify($json.contextSnapshot.route) }}",
+            "transport": "={{ JSON.stringify($json.contextSnapshot.transport) }}",
+            "weather": "={{ JSON.stringify($json.contextSnapshot.weather) }}",
+            "calendar": "={{ JSON.stringify($json.contextSnapshot.calendar) }}",
+            "user_preferences": "={{ JSON.stringify($json.contextSnapshot.userPreferences) }}",
+            "analysis": "={{ JSON.stringify($json.contextSnapshot.analysis) }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "ba98db3f-01a3-4cde-9156-b27f86eb25a8",
+      "name": "Store Context Snapshot",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1280, 992]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "disruption-check",
+              "leftValue": "={{ $('Build Context Snapshot').first().json.contextSnapshot.analysis.hasDisruption }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "09336ef1-b149-4b3f-9261-a44267ee2a20",
+      "name": "Disruption Detected?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1504, 992]
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "value": "public",
+          "mode": "list"
+        },
+        "table": {
+          "__rl": true,
+          "value": "decisions",
+          "mode": "list"
+        },
+        "limit": 1,
+        "sort": {
+          "values": [
+            {
+              "column": "created_at",
+              "direction": "DESC"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "0d26ae60-8a6d-4d51-8e5e-744d3fe49d0d",
+      "name": "Get Last Decision",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1712, 896]
+    },
+    {
+      "parameters": {
+        "jsCode": "// BUILD DECISION PROMPT: LLM reasons over stored context\n\nconst contextSnapshot = $('Build Context Snapshot').first().json.contextSnapshot;\nconst lastDecision = $('Get Last Decision').first()?.json || null;\n\nconst systemPrompt = `You are a commute decision assistant for Hamburg → Bremen via RE4 train.\n\nROLE: Analyze the provided context data and recommend ONE clear action.\n\nPRINCIPLE: \"This app tells you what to do\" — reduce stress, avoid pointless waiting.\n\nDECISION TYPES:\n- WORK_FROM_HOME_TEMPORARILY: Disruption now, stable connection later, user can work from home\n- WAIT_AND_LEAVE_LATER: Minor delay, worth waiting briefly  \n- LEAVE_NOW: Current connection is best option\n- LEAVE_EARLIER_THAN_USUAL: Avoid rain or anticipated disruptions\n\nDECISION RULES:\n1. Cancelled trains = NEVER recommend\n2. Delays >10min = significant, avoid if alternative exists\n3. Rain = avoid outdoor waiting at station\n4. User MUST arrive before their next meeting (with buffer)\n5. If homeOfficeAllowed=true, prefer WORK_FROM_HOME_TEMPORARILY over waiting at station\n6. Recommend STABLE connections, not just fastest\n7. Consider the full context: weather, calendar, all connections`;\n\nconst userPrompt = `CONTEXT SNAPSHOT:\n${JSON.stringify(contextSnapshot, null, 2)}\n\n${lastDecision ? `PREVIOUS DECISION: ${lastDecision.decision} (departure: ${JSON.parse(lastDecision.recommendation || '{}').recommendedDepartureTime})` : 'No previous decision.'}\n\nGenerate a decision. OUTPUT (strict JSON, no markdown):\n{\n  \"decision\": \"WORK_FROM_HOME_TEMPORARILY|WAIT_AND_LEAVE_LATER|LEAVE_NOW|LEAVE_EARLIER_THAN_USUAL\",\n  \"confidence\": 0.0-1.0,\n  \"currentUpdates\": [\n    {\"type\":\"transport|weather\",\"icon\":\"train|rain|sun|warning\",\"title\":\"short title\",\"message\":\"details\",\"severity\":\"low|medium|high\",\"line\":\"RE4\"}\n  ],\n  \"recommendation\": {\n    \"action\": \"What to do now (imperative)\",\n    \"primaryInstruction\": \"Take the RE4 at HH:MM\",\n    \"recommendedDepartureTime\": \"HH:MM\",\n    \"icon\": \"train|home|clock\",\n    \"reasonShort\": \"One sentence why\",\n    \"reasonLong\": \"Full explanation with details from context\"\n  },\n  \"explanationShort\": \"Push notification text (max 100 chars)\",\n  \"explanationLong\": \"Full voice explanation (2-3 sentences, friendly tone)\",\n  \"uiHints\": {\"highlightAction\":true,\"playVoiceSummary\":true,\"confidenceIndicator\":\"high|medium|low\"}\n}`;\n\nreturn {\n  systemPrompt,\n  userPrompt,\n  contextSnapshot,\n  lastDecision\n};"
+      },
+      "id": "6afdf32c-f6da-42c6-b0d1-9fc77c903f6b",
+      "name": "Build Decision Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1936, 896]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={{ $env.GEMINI_API_KEY }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [\n    {\n      \"role\": \"user\",\n      \"parts\": [{ \"text\": {{ JSON.stringify($json.systemPrompt + \"\\n\\n\" + $json.userPrompt) }} }]\n    }\n  ],\n  \"generationConfig\": {\n    \"responseMimeType\": \"application/json\",\n    \"temperature\": 0.4,\n    \"maxOutputTokens\": 1024\n  }\n}",
+        "options": { "timeout": 30000 }
+      },
+      "id": "343cf987-ae21-4835-b2c3-16045aa642dd",
+      "name": "Gemini: Generate Decision",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2160, 896]
+    },
+    {
+      "parameters": {
+        "jsCode": "// PARSE: Extract AgentDecision from Gemini response\n\nconst geminiResponse = $input.first().json;\nconst previousData = $('Build Decision Prompt').first().json;\nconst contextSnapshot = previousData.contextSnapshot;\n\ntry {\n  const text = geminiResponse.candidates?.[0]?.content?.parts?.[0]?.text;\n  if (!text) throw new Error('No text in Gemini response');\n  \n  const decision = JSON.parse(text);\n  \n  if (!decision.decision || !decision.recommendation || !decision.explanationShort) {\n    throw new Error('Invalid decision structure');\n  }\n  \n  return {\n    id: `dec_${Date.now()}`,\n    ...decision,\n    sessionToken: contextSnapshot.sessionToken,\n    snapshotId: contextSnapshot.id,\n    created_at: new Date().toISOString()\n  };\n} catch (error) {\n  return {\n    id: `dec_fallback_${Date.now()}`,\n    decision: 'LEAVE_NOW',\n    confidence: 0.5,\n    sessionToken: contextSnapshot.sessionToken,\n    snapshotId: contextSnapshot.id,\n    currentUpdates: [{\n      type: 'transport',\n      icon: 'warning',\n      title: 'Status check recommended',\n      message: 'Please verify current train status',\n      severity: 'medium'\n    }],\n    recommendation: {\n      action: 'Check current status',\n      primaryInstruction: 'Verify RE4 status on DB app',\n      recommendedDepartureTime: 'now',\n      icon: 'train',\n      reasonShort: 'Unable to generate recommendation',\n      reasonLong: 'The system could not generate a recommendation. Please check the Deutsche Bahn app.'\n    },\n    explanationShort: 'Check DB app for current status',\n    explanationLong: 'I could not generate a decision. Please check the transport status manually.',\n    uiHints: { highlightAction: false, playVoiceSummary: false, confidenceIndicator: 'low' },\n    _error: error.message,\n    created_at: new Date().toISOString()\n  };\n}"
+      },
+      "id": "710a392e-2574-4cae-a434-ea293cfdcac5",
+      "name": "Parse Decision",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2384, 896]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.elevenlabs.io/v1/text-to-speech/{{ $env.ELEVENLABS_VOICE_ID }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "xi-api-key", "value": "={{ $env.ELEVENLABS_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Accept", "value": "audio/mpeg" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"text\": {{ JSON.stringify($json.explanationLong) }},\n  \"model_id\": \"eleven_multilingual_v2\",\n  \"voice_settings\": {\n    \"stability\": 0.5,\n    \"similarity_boost\": 0.75,\n    \"style\": 0.3,\n    \"use_speaker_boost\": true\n  }\n}",
+        "options": {
+          "response": { "response": { "responseFormat": "file" } },
+          "timeout": 30000
+        }
+      },
+      "id": "b0a256b7-e825-4d68-a811-ef86ea3d8d17",
+      "name": "ElevenLabs: Generate Audio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3104, 896]
+    },
+    {
+      "parameters": {
+        "jsCode": "// UPLOAD AUDIO: Store MP3 and get URL\n// In production, upload to Supabase Storage or S3\n\nconst decision = $('Parse Decision').first().json;\nconst audioData = $input.first().binary?.data;\n\n// Generate audio URL (in production: upload to storage and get URL)\nconst audioFilename = `audio_${decision.id}.mp3`;\nconst audioUrl = `https://storage.supabase.co/v1/object/public/audio/${audioFilename}`;\n\n// For now, we'll store a reference. In production:\n// 1. Upload audioData to Supabase Storage\n// 2. Get the public URL\n// 3. Store URL with decision\n\nreturn {\n  ...decision,\n  audioUrl,\n  audioFilename,\n  audioGenerated: true\n};"
+      },
+      "id": "4db6446d-232b-474c-9db0-43cebed93fde",
+      "name": "Process Audio URL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3328, 896]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "decision-changed",
+              "leftValue": "={{ $json.decision }}",
+              "rightValue": "={{ $('Get Last Decision').first()?.json?.decision }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "id": "e1800c40-b84d-4641-b3ab-04d9e1449379",
+      "name": "Decision Changed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [2608, 896]
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "value": "public",
+          "mode": "list"
+        },
+        "table": {
+          "__rl": true,
+          "value": "decisions",
+          "mode": "list"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.id }}",
+            "session_token": "={{ $json.sessionToken }}",
+            "snapshot_id": "={{ $json.snapshotId }}",
+            "decision": "={{ $json.decision }}",
+            "confidence": "={{ $json.confidence }}",
+            "current_updates": "={{ JSON.stringify($json.currentUpdates) }}",
+            "recommendation": "={{ JSON.stringify($json.recommendation) }}",
+            "explanation_short": "={{ $json.explanationShort }}",
+            "explanation_long": "={{ $json.explanationLong }}",
+            "ui_hints": "={{ JSON.stringify($json.uiHints) }}",
+            "audio_url": "={{ $json.audioUrl }}",
+            "created_at": "={{ $json.created_at }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "1b06c9d0-feb8-48c3-832f-936bbe74bb98",
+      "name": "Store Decision",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [2832, 800]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://fcm.googleapis.com/fcm/send",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=key={{ $env.FCM_SERVER_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"to\": \"/topics/commute-alerts\",\n  \"notification\": {\n    \"title\": \"Commute Update\",\n    \"body\": {{ JSON.stringify($json.explanationShort) }},\n    \"sound\": \"default\",\n    \"badge\": 1\n  },\n  \"data\": {\n    \"decisionId\": {{ JSON.stringify($json.id) }},\n    \"sessionToken\": {{ JSON.stringify($json.sessionToken) }},\n    \"decision\": {{ JSON.stringify($json.decision) }},\n    \"recommendedTime\": {{ JSON.stringify($json.recommendation.recommendedDepartureTime) }},\n    \"audioUrl\": {{ JSON.stringify($json.audioUrl) }},\n    \"deepLink\": \"commutecopilot://decision/{{ $json.id }}\"\n  },\n  \"android\": {\n    \"priority\": \"high\",\n    \"notification\": {\n      \"channel_id\": \"commute_alerts\"\n    }\n  },\n  \"apns\": {\n    \"payload\": {\n      \"aps\": {\n        \"category\": \"COMMUTE_ALERT\",\n        \"interruption-level\": \"time-sensitive\"\n      }\n    }\n  }\n}",
+        "options": { "timeout": 10000 }
+      },
+      "id": "c55af31b-6e50-4057-8258-e1f6299f9eca",
+      "name": "Send Push Notification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3520, 800]
+    },
+    {
+      "parameters": {
+        "jsCode": "// USER REPLY HANDLER: Parse incoming request\n\nconst body = $input.first().json.body || $input.first().json;\nconst sessionToken = body.sessionToken;\nconst userMessage = body.message || body.text || '';\nconst replyType = body.replyType || 'question';\nconst modifyConstraints = body.modifyConstraints || {};\n\nif (!sessionToken) {\n  throw new Error('Missing sessionToken in request');\n}\n\nreturn {\n  sessionToken,\n  userMessage,\n  replyType,\n  modifyConstraints,\n  receivedAt: new Date().toISOString()\n};"
+      },
+      "id": "6b13aec1-0f8a-41bd-b8c8-fd4cb78d8a45",
+      "name": "Parse User Reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [624, 1392]
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "value": "public",
+          "mode": "list"
+        },
+        "table": {
+          "__rl": true,
+          "value": "decisions",
+          "mode": "list"
+        },
+        "limit": 1,
+        "where": {
+          "values": [
+            {
+              "column": "session_token",
+              "value": "={{ $json.sessionToken }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1123411d-59de-49ac-9d90-42ef37f547af",
+      "name": "Get Decision by Session",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [832, 1584]
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "value": "public",
+          "mode": "list"
+        },
+        "table": {
+          "__rl": true,
+          "value": "context_snapshots",
+          "mode": "list"
+        },
+        "limit": 1,
+        "where": {
+          "values": [
+            {
+              "column": "session_token",
+              "value": "={{ $('Parse User Reply').first().json.sessionToken }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c94f0bf6-a299-46f4-8825-d73e55f191c3",
+      "name": "Get Context Snapshot",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1040, 1584]
+    },
+    {
+      "parameters": {
+        "jsCode": "// BUILD REPLY PROMPT: LLM reasons over STORED context (no new API calls)\n\nconst replyData = $('Parse User Reply').first().json;\nconst decisionRecord = $('Get Decision by Session').first()?.json || {};\nconst contextRecord = $('Get Context Snapshot').first()?.json || {};\n\n// Parse stored JSON fields\nconst transport = JSON.parse(contextRecord.transport || '{}');\nconst weather = JSON.parse(contextRecord.weather || '{}');\nconst calendar = JSON.parse(contextRecord.calendar || '{}');\nconst originalDecision = {\n  decision: decisionRecord.decision,\n  recommendation: JSON.parse(decisionRecord.recommendation || '{}'),\n  explanationLong: decisionRecord.explanation_long\n};\n\nconst systemPrompt = `You are a helpful commute assistant. The user is asking about their commute.\n\nYou have access to the STORED CONTEXT from when the recommendation was made:\n\nTRANSPORT DATA:\n${JSON.stringify(transport, null, 2)}\n\nWEATHER DATA:\n${JSON.stringify(weather, null, 2)}\n\nCALENDAR DATA:\n${JSON.stringify(calendar, null, 2)}\n\nORIGINAL RECOMMENDATION:\n- Decision: ${originalDecision.decision}\n- Recommended departure: ${originalDecision.recommendation.recommendedDepartureTime}\n- Reason: ${originalDecision.recommendation.reasonLong}\n\nINSTRUCTIONS:\n1. Answer the user's question using the stored context data\n2. If they ask to modify (leave later/earlier), find a suitable connection from the stored transport data\n3. Be conversational but concise\n4. Always reference specific data (times, delays, weather conditions)\n5. If asked about something not in the context, say you don't have that information`;\n\nlet userPrompt;\nif (replyData.replyType === 'modify') {\n  const delayMinutes = replyData.modifyConstraints.minDepartureDelayMinutes || 0;\n  userPrompt = `User request: \"${replyData.userMessage}\"\n\nThey want to modify their departure. Constraints: leave at least ${delayMinutes} minutes later than original recommendation.\n\nFind a suitable connection from the STORED transport data. Do NOT fetch new data.\n\nRespond with JSON:\n{\n  \"responseText\": \"Your conversational response acknowledging the change\",\n  \"newRecommendation\": {\n    \"action\": \"Updated action\",\n    \"primaryInstruction\": \"Take the RE4 at HH:MM\",\n    \"recommendedDepartureTime\": \"HH:MM\",\n    \"reasonShort\": \"Why this works\",\n    \"reasonLong\": \"Full explanation\"\n  }\n}`;\n} else {\n  userPrompt = `User question: \"${replyData.userMessage}\"\n\nAnswer using the stored context data. Be specific with times and conditions.\n\nRespond with JSON:\n{\n  \"responseText\": \"Your helpful answer based on the stored data\",\n  \"newRecommendation\": null\n}`;\n}\n\nreturn {\n  systemPrompt,\n  userPrompt,\n  replyData,\n  originalDecision,\n  sessionToken: replyData.sessionToken\n};"
+      },
+      "id": "ce04e2cf-8ec1-4e8f-a533-5b8ed8085581",
+      "name": "Build Reply Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1232, 1392]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={{ $env.GEMINI_API_KEY }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [\n    {\n      \"role\": \"user\",\n      \"parts\": [{ \"text\": {{ JSON.stringify($json.systemPrompt + \"\\n\\n\" + $json.userPrompt) }} }]\n    }\n  ],\n  \"generationConfig\": {\n    \"responseMimeType\": \"application/json\",\n    \"temperature\": 0.6,\n    \"maxOutputTokens\": 512\n  }\n}",
+        "options": { "timeout": 30000 }
+      },
+      "id": "78de1959-60d9-4e44-96ac-40456d05593f",
+      "name": "Gemini: Generate Reply",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1456, 1392]
+    },
+    {
+      "parameters": {
+        "jsCode": "// PARSE REPLY: Extract response from Gemini\n\nconst geminiResponse = $input.first().json;\nconst previousData = $('Build Reply Prompt').first().json;\n\ntry {\n  const text = geminiResponse.candidates?.[0]?.content?.parts?.[0]?.text;\n  if (!text) throw new Error('No text in Gemini response');\n  \n  const response = JSON.parse(text);\n  \n  return {\n    responseText: response.responseText || 'I understood your request.',\n    newRecommendation: response.newRecommendation || null,\n    sessionToken: previousData.sessionToken,\n    replyType: previousData.replyData.replyType\n  };\n} catch (error) {\n  return {\n    responseText: 'I understood your question. Based on the current data, I recommend following the original plan.',\n    newRecommendation: null,\n    sessionToken: previousData.sessionToken,\n    replyType: previousData.replyData.replyType,\n    _error: error.message\n  };\n}"
+      },
+      "id": "a244427a-43ce-4a01-a5dd-126ff3969dfd",
+      "name": "Parse Reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1664, 1392]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.elevenlabs.io/v1/text-to-speech/{{ $env.ELEVENLABS_VOICE_ID }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "xi-api-key", "value": "={{ $env.ELEVENLABS_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Accept", "value": "audio/mpeg" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"text\": {{ JSON.stringify($json.responseText) }},\n  \"model_id\": \"eleven_multilingual_v2\",\n  \"voice_settings\": {\n    \"stability\": 0.5,\n    \"similarity_boost\": 0.75,\n    \"style\": 0.3,\n    \"use_speaker_boost\": true\n  }\n}",
+        "options": {
+          "response": { "response": { "responseFormat": "file" } },
+          "timeout": 30000
+        }
+      },
+      "id": "ad8e13e4-6318-4e98-9e65-1890d40cb287",
+      "name": "ElevenLabs: Generate Reply Audio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1888, 1392]
+    },
+    {
+      "parameters": {
+        "jsCode": "// BUILD FINAL RESPONSE: Include audio URL\n\nconst replyData = $('Parse Reply').first().json;\nconst audioData = $input.first().binary?.data;\n\nconst messageId = `msg_${Date.now()}`;\nconst audioFilename = `audio_${messageId}.mp3`;\nconst audioUrl = `https://storage.supabase.co/v1/object/public/audio/${audioFilename}`;\n\n// Build response for app\nreturn {\n  success: true,\n  message: {\n    id: messageId,\n    role: 'assistant',\n    text: replyData.responseText,\n    audioUrl: audioUrl,\n    created_at: new Date().toISOString()\n  },\n  updatedRecommendation: replyData.newRecommendation,\n  sessionToken: replyData.sessionToken\n};"
+      },
+      "id": "2a4d1092-f560-468e-8afe-d9d02d8441bf",
+      "name": "Build Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2112, 1392]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": { "responseCode": 200 }
+      },
+      "id": "a3c32757-a836-447b-853a-0264e68c339a",
+      "name": "Respond to App",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [2336, 1392]
+    },
+    {
+      "parameters": {
+        "jsCode": "// SKIP: No disruption detected\nreturn { skipped: true, reason: 'No disruption detected', timestamp: new Date().toISOString() };"
+      },
+      "id": "0a408e7b-47ea-4f38-af9e-3d0a6f8a4cb1",
+      "name": "Skip (No Disruption)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1712, 1104]
+    },
+    {
+      "parameters": {
+        "jsCode": "// SKIP: Decision unchanged\nreturn { skipped: true, reason: 'Decision unchanged - no notification sent', timestamp: new Date().toISOString() };"
+      },
+      "id": "87ec9241-8454-420b-9b71-cf5c35598dd7",
+      "name": "Skip (Unchanged)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2832, 1024]
+    },
+    {
+      "parameters": {
+        "jsCode": "// SKIP: Outside commute hours\nreturn { skipped: true, reason: 'Outside commute hours (6-10 AM weekdays)', timestamp: new Date().toISOString() };"
+      },
+      "id": "348d7a05-0b33-452c-82d3-9e35c680146f",
+      "name": "Skip (Outside Hours)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [832, 752]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.elevenlabs.io/v1/text-to-speech/{{ $env.ELEVENLABS_VOICE_ID }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "xi-api-key", "value": "={{ $env.ELEVENLABS_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Accept", "value": "audio/mpeg" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"text\": {{ JSON.stringify($json.explanationLong) }},\n  \"model_id\": \"eleven_multilingual_v2\",\n  \"voice_settings\": {\n    \"stability\": 0.5,\n    \"similarity_boost\": 0.75,\n    \"style\": 0.3,\n    \"use_speaker_boost\": true\n  }\n}",
+        "options": {
+          "response": { "response": { "responseFormat": "file" } },
+          "timeout": 30000
+        }
+      },
+      "id": "d474c914-df8d-48f0-a0f7-d648edfe4648",
+      "name": "ElevenLabs: Generate Request from Audio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [928, 1392]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Every 5 Minutes": {
+      "main": [
+        [{ "node": "Is Commute Time?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Is Commute Time?": {
+      "main": [
+        [
+          { "node": "Fetch Train Connections", "type": "main", "index": 0 },
+          { "node": "Fetch Weather", "type": "main", "index": 0 },
+          { "node": "Fetch Calendar Events", "type": "main", "index": 0 }
+        ],
+        [{ "node": "Skip (Outside Hours)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Fetch Train Connections": {
+      "main": [
+        [{ "node": "Build Context Snapshot", "type": "main", "index": 0 }]
+      ]
+    },
+    "Fetch Weather": {
+      "main": [
+        [{ "node": "Build Context Snapshot", "type": "main", "index": 0 }]
+      ]
+    },
+    "Fetch Calendar Events": {
+      "main": [
+        [{ "node": "Build Context Snapshot", "type": "main", "index": 0 }]
+      ]
+    },
+    "Build Context Snapshot": {
+      "main": [
+        [{ "node": "Store Context Snapshot", "type": "main", "index": 0 }]
+      ]
+    },
+    "Store Context Snapshot": {
+      "main": [
+        [{ "node": "Disruption Detected?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Disruption Detected?": {
+      "main": [
+        [{ "node": "Get Last Decision", "type": "main", "index": 0 }],
+        [{ "node": "Skip (No Disruption)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Last Decision": {
+      "main": [
+        [{ "node": "Build Decision Prompt", "type": "main", "index": 0 }]
+      ]
+    },
+    "Build Decision Prompt": {
+      "main": [
+        [{ "node": "Gemini: Generate Decision", "type": "main", "index": 0 }]
+      ]
+    },
+    "Gemini: Generate Decision": {
+      "main": [
+        [{ "node": "Parse Decision", "type": "main", "index": 0 }]
+      ]
+    },
+    "Parse Decision": {
+      "main": [
+        [{ "node": "Decision Changed?", "type": "main", "index": 0 }]
+      ]
+    },
+    "ElevenLabs: Generate Audio": {
+      "main": [
+        [{ "node": "Process Audio URL", "type": "main", "index": 0 }]
+      ]
+    },
+    "Process Audio URL": {
+      "main": [
+        [{ "node": "Send Push Notification", "type": "main", "index": 0 }]
+      ]
+    },
+    "Decision Changed?": {
+      "main": [
+        [{ "node": "Store Decision", "type": "main", "index": 0 }],
+        [{ "node": "Skip (Unchanged)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Store Decision": {
+      "main": [
+        [
+          { "node": "Send Push Notification", "type": "main", "index": 0 },
+          { "node": "ElevenLabs: Generate Audio", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "User Reply Webhook": {
+      "main": [
+        [{ "node": "Parse User Reply", "type": "main", "index": 0 }]
+      ]
+    },
+    "Parse User Reply": {
+      "main": [
+        [
+          { "node": "ElevenLabs: Generate Request from Audio", "type": "main", "index": 0 },
+          { "node": "Get Decision by Session", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Get Decision by Session": {
+      "main": [
+        [{ "node": "Get Context Snapshot", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Context Snapshot": {
+      "main": [
+        [{ "node": "Build Reply Prompt", "type": "main", "index": 0 }]
+      ]
+    },
+    "Build Reply Prompt": {
+      "main": [
+        [{ "node": "Gemini: Generate Reply", "type": "main", "index": 0 }]
+      ]
+    },
+    "Gemini: Generate Reply": {
+      "main": [
+        [{ "node": "Parse Reply", "type": "main", "index": 0 }]
+      ]
+    },
+    "Parse Reply": {
+      "main": [
+        [{ "node": "ElevenLabs: Generate Reply Audio", "type": "main", "index": 0 }]
+      ]
+    },
+    "ElevenLabs: Generate Reply Audio": {
+      "main": [
+        [{ "node": "Build Response", "type": "main", "index": 0 }]
+      ]
+    },
+    "Build Response": {
+      "main": [
+        [{ "node": "Respond to App", "type": "main", "index": 0 }]
+      ]
+    },
+    "ElevenLabs: Generate Request from Audio": {
+      "main": [
+        [{ "node": "Build Reply Prompt", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "commute-copilot" },
+    { "name": "production" },
+    { "name": "scheduled" },
+    { "name": "decision-engine" },
+    { "name": "gemini" }
+  ],
+  "triggerCount": 0,
+  "updatedAt": "2026-01-31T17:30:00.000Z",
+  "versionId": "3"
+}

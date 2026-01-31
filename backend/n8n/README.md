@@ -51,7 +51,84 @@ In n8n UI, go to **Credentials** and add:
 2. Paste: `https://raw.githubusercontent.com/YOUR_REPO/backend/n8n/workflow-b-ondemand.json`
 
 **Files available:**
-- `workflow-b-ondemand.json` - On-demand decision with demo mode support
+- `workflow-b-ondemand.json` - Simple demo workflow (mock data, for testing)
+- `workflow-production.json` - Full production workflow with scheduled checks + user replies
+
+## Architecture Philosophy: Store Once, Reason Many Times
+
+The production workflow follows a key principle: **fetch API data once, store it, then let the LLM reason over the stored context** for all subsequent interactions.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         STORE ONCE, REASON MANY                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│   SCHEDULED TRIGGER (Every 5 min)                                           │
+│        │                                                                    │
+│        ▼                                                                    │
+│   ┌─────────────────┐                                                       │
+│   │ Fetch APIs      │  transport.rest, Open-Meteo, Google Calendar          │
+│   └────────┬────────┘                                                       │
+│            │                                                                │
+│            ▼                                                                │
+│   ┌─────────────────┐                                                       │
+│   │ Store Context   │  → context_snapshots table (with session_token)       │
+│   │ Snapshot in DB  │     - transport: connections, delays, cancellations   │
+│   └────────┬────────┘     - weather: hourly forecast, rain times            │
+│            │              - calendar: meetings, constraints                 │
+│            ▼                                                                │
+│   ┌─────────────────┐                                                       │
+│   │ Gemini reasons  │  LLM analyzes stored context → decision               │
+│   │ over context    │                                                       │
+│   └────────┬────────┘                                                       │
+│            │                                                                │
+│            ▼                                                                │
+│   ┌─────────────────┐                                                       │
+│   │ ElevenLabs TTS  │  Generate audio explanation (.mp3)                    │
+│   └────────┬────────┘                                                       │
+│            │                                                                │
+│            ▼                                                                │
+│   ┌─────────────────┐                                                       │
+│   │ Store Decision  │  → decisions table (linked to snapshot)               │
+│   │ + Send Push     │     - includes audio_url                              │
+│   └─────────────────┘                                                       │
+│                                                                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│   USER REPLY (POST /reply with sessionToken)                                │
+│        │                                                                    │
+│        ▼                                                                    │
+│   ┌─────────────────┐                                                       │
+│   │ Lookup stored   │  ← context_snapshots + decisions tables               │
+│   │ context by      │     NO NEW API CALLS - use stored data!               │
+│   │ sessionToken    │                                                       │
+│   └────────┬────────┘                                                       │
+│            │                                                                │
+│            ▼                                                                │
+│   ┌─────────────────┐                                                       │
+│   │ Gemini reasons  │  "Based on the stored connections at 08:34, 09:04..." │
+│   │ over STORED     │  "The rain stops at 09:00 according to forecast..."   │
+│   │ context         │                                                       │
+│   └────────┬────────┘                                                       │
+│            │                                                                │
+│            ▼                                                                │
+│   ┌─────────────────┐                                                       │
+│   │ ElevenLabs TTS  │  Generate audio response (.mp3)                       │
+│   └────────┬────────┘                                                       │
+│            │                                                                │
+│            ▼                                                                │
+│   ┌─────────────────┐                                                       │
+│   │ Respond to App  │  { message, audioUrl, updatedRecommendation }         │
+│   └─────────────────┘                                                       │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Benefits:**
+1. **Consistent reasoning**: LLM sees exact same data user saw when asking questions
+2. **Faster responses**: No API latency for follow-up questions
+3. **Flexible queries**: User can ask "when does rain stop?", "what's the next train?", "how delayed is the 08:06?" - all answered from stored context
+4. **Auditability**: Full history of what data led to each decision
 
 ## Workflow Details
 
@@ -150,16 +227,233 @@ Demo Mode? ───────────────────────
 
 See `workflow-b-ondemand-template.md` for additional node configuration details.
 
-### Workflow A: Scheduled Check (Phase 2)
+### Production Workflow (workflow-production.json)
 
-**Trigger**: Cron `*/5 7-9 * * 1-5` (every 5 min, 7-9 AM, weekdays)
+**Full production workflow combining scheduled checks and user reply handling.**
 
-**Steps**: Same as Workflow B, plus:
-- Fetch previous decision from DB
-- Compare decision types (WORK_FROM_HOME_TEMPORARILY vs LEAVE_NOW)
-- If changed: send push notification via FCM/OneSignal
+**Two Entry Points:**
 
-See `workflow-a-scheduled-template.md`.
+1. **Scheduled Trigger** (Every 5 Minutes, 6-10 AM weekdays)
+2. **User Reply Webhook** (POST `/reply`)
+
+**Architecture:**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    SCHEDULED PATH (Every 5 min)                 │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Every 5 Minutes                                                │
+│       │                                                         │
+│       ▼                                                         │
+│  Is Commute Time? ─────────────────────────────┐                │
+│       │ (6-10 AM weekdays)                     │ (no)           │
+│       ▼                                        ▼                │
+│  ┌────────────────────────┐            Skip (Outside Hours)     │
+│  │ Fetch Train Connections│                                     │
+│  │ Fetch Weather          │                                     │
+│  │ Fetch Calendar Events  │                                     │
+│  └───────────┬────────────┘                                     │
+│              │                                                  │
+│              ▼                                                  │
+│     Transform to AgentInfo                                      │
+│              │                                                  │
+│              ▼                                                  │
+│     Disruption Detected? ──────────────────────┐                │
+│              │ (yes)                           │ (no)           │
+│              ▼                                 ▼                │
+│     Get Last Decision                  Skip (No Disruption)     │
+│              │                                                  │
+│              ▼                                                  │
+│     Build Gemini Prompt                                         │
+│              │                                                  │
+│              ▼                                                  │
+│     Call Gemini API                                             │
+│              │                                                  │
+│              ▼                                                  │
+│     Parse Gemini Response                                       │
+│              │                                                  │
+│              ▼                                                  │
+│     Decision Changed? ─────────────────────────┐                │
+│              │ (yes)                           │ (no)           │
+│              ▼                                 ▼                │
+│     Store Decision                      Skip (Unchanged)        │
+│              │                                                  │
+│              ▼                                                  │
+│     Send Push Notification (FCM)                                │
+│              │                                                  │
+│              ▼                                                  │
+│     📱 App receives notification with sessionToken              │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│                    USER REPLY PATH (Webhook)                    │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  POST /reply                                                    │
+│  { sessionToken, message, replyType, modifyConstraints }        │
+│       │                                                         │
+│       ▼                                                         │
+│  Parse User Reply                                               │
+│       │                                                         │
+│       ▼                                                         │
+│  Get Decision by Session (DB lookup)                            │
+│       │                                                         │
+│       ▼                                                         │
+│  Is Modify Request? ───────────────────────────┐                │
+│       │ (yes)                                  │ (no: question) │
+│       ▼                                        │                │
+│  Fetch Later Connections                       │                │
+│  (with time offset)                            │                │
+│       │                                        │                │
+│       └──────────────┬─────────────────────────┘                │
+│                      ▼                                          │
+│              Build Reply Prompt                                 │
+│                      │                                          │
+│                      ▼                                          │
+│              Call Gemini for Reply                              │
+│                      │                                          │
+│                      ▼                                          │
+│              Parse Reply Response                               │
+│                      │                                          │
+│                      ▼                                          │
+│              Respond to User (JSON)                             │
+│              { message, updatedDecision, newDepartureTime }     │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Required Environment Variables:**
+
+| Variable | Purpose |
+|----------|---------|
+| `GEMINI_API_KEY` | Decision generation via Google AI |
+| `ELEVENLABS_API_KEY` | Text-to-speech for audio responses |
+| `ELEVENLABS_VOICE_ID` | Voice ID (e.g., "21m00Tcm4TlvDq8ikWAM") |
+| `FCM_SERVER_KEY` | Firebase Cloud Messaging for push |
+
+**Required n8n Credentials:**
+
+| Credential | Purpose |
+|------------|---------|
+| `Supabase Postgres` | PostgreSQL connection for context + decisions storage |
+| `Google Calendar` | OAuth2 for calendar access |
+
+**Database Tables:**
+
+| Table | Purpose |
+|-------|---------|
+| `context_snapshots` | Stores fetched API data (transport, weather, calendar) |
+| `decisions` | LLM-generated recommendations linked to snapshots |
+| `conversation_messages` | User replies and assistant responses with audio |
+
+**Response Format (Always includes audio):**
+
+Every response to the app includes an `audioUrl` pointing to an ElevenLabs-generated MP3:
+
+```json
+{
+  "success": true,
+  "message": {
+    "id": "msg_123",
+    "role": "assistant", 
+    "text": "Got it! I've updated your recommendation...",
+    "audioUrl": "https://storage.supabase.co/v1/object/public/audio/audio_msg_123.mp3",
+    "created_at": "2026-01-31T08:30:00Z"
+  },
+  "updatedRecommendation": { ... },
+  "sessionToken": "session_abc123"
+}
+```
+
+**Session Token Flow:**
+
+1. Scheduled check detects disruption → generates decision with `sessionToken`
+2. Push notification sent to app with `sessionToken` in data payload
+3. User receives notification, taps to open app
+4. User asks follow-up question (e.g., "Can I leave 2 hours later?")
+5. App sends POST `/reply` with `sessionToken` + user message
+6. n8n looks up original decision by session token
+7. Gemini generates contextual response
+8. Response returned to app
+
+**Example User Reply Request:**
+
+```json
+POST /reply
+{
+  "sessionToken": "session_1706716800000_abc123",
+  "message": "Can I stay home for 2 more hours?",
+  "replyType": "modify",
+  "modifyConstraints": {
+    "minDepartureDelayMinutes": 120
+  }
+}
+```
+
+**Example Response:**
+
+```json
+{
+  "success": true,
+  "message": {
+    "id": "msg_1706717400000",
+    "role": "assistant",
+    "text": "Got it! I've updated your recommendation. You can now work from home until 10:00 and take the RE4 at 10:34.",
+    "audioUrl": "https://storage.supabase.co/v1/object/public/audio/audio_msg_1706717400000.mp3",
+    "created_at": "2026-01-31T08:30:00.000Z"
+  },
+  "updatedRecommendation": {
+    "action": "Continue working from home",
+    "primaryInstruction": "Take the RE4 at 10:34",
+    "recommendedDepartureTime": "10:34",
+    "reasonShort": "You requested 2 more hours at home",
+    "reasonLong": "Based on the stored transport data, the RE4 at 10:34 is running on time..."
+  },
+  "sessionToken": "session_1706716800000_abc123"
+}
+```
+
+**What the LLM Sees (from stored context):**
+
+When answering user questions, the LLM receives the full stored context:
+
+```
+TRANSPORT DATA:
+{
+  "connections": [
+    {"departure": "07:34", "line": "RE4", "status": "CANCELLED", "remarks": ["Signal failure"]},
+    {"departure": "08:06", "line": "RE4", "status": "DELAYED", "delayMinutes": 12},
+    {"departure": "08:34", "line": "RE4", "status": "ON_TIME"},
+    {"departure": "09:04", "line": "RE4", "status": "ON_TIME"},
+    {"departure": "10:34", "line": "RE4", "status": "ON_TIME"}
+  ]
+}
+
+WEATHER DATA:
+{
+  "condition": "rain",
+  "rainStartsAt": "07:00",
+  "hourlyForecast": [
+    {"hour": 7, "precipitation": 2.5},
+    {"hour": 8, "precipitation": 1.2},
+    {"hour": 9, "precipitation": 0.1},
+    {"hour": 10, "precipitation": 0}
+  ]
+}
+
+CALENDAR DATA:
+{
+  "nextMeeting": {"title": "Team Standup", "localTime": "10:30"},
+  "events": [...]
+}
+```
+
+This allows the LLM to answer questions like:
+- "When does the rain stop?" → "Based on the forecast, rain clears up by 9:00."
+- "What about the 09:04 train?" → "The RE4 at 09:04 is running on time."
+- "Can I make my 10:30 meeting if I leave at 09:04?" → "Yes, you'd arrive at ~10:15."
 
 ### Workflow C: User Reply (Phase 3)
 
