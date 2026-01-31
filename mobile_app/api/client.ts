@@ -1,5 +1,6 @@
-import { AgentDecision, ConversationMessage, Settings } from '../types';
+import { AgentDecision, ConversationMessage, Settings, FollowUpRequest, FollowUpResponse } from '../types';
 import { getMockDecision, getMockAudioUrl, postMockFollowUp, getLatestDecisionId as getMockLatestId, resetFollowUpCount as resetMockFollowUpCount } from './mock';
+import * as FileSystem from 'expo-file-system';
 
 let currentSettings: Settings | null = null;
 
@@ -61,59 +62,58 @@ export async function getAudioUrl(decisionId: string): Promise<string> {
 }
 
 /**
- * Send a follow-up message and get AI response with audio
- * @param userText - Transcribed text from user
- * @param userAudioUri - Optional URI to user's recorded audio file
+ * Send a follow-up with user audio and get AI response
+ * @param threadId - The conversation/decision thread ID
+ * @param userAudioUri - URI to user's recorded audio file
  */
 export async function postFollowUp(
-  userText: string, 
-  userAudioUri?: string
+  threadId: string, 
+  userAudioUri: string
 ): Promise<ConversationMessage> {
   if (shouldUseMock()) {
-    return postMockFollowUp(userText, userAudioUri);
+    return postMockFollowUp(threadId, userAudioUri);
   }
   
-  // For real backend: send audio as multipart form data
-  if (userAudioUri) {
-    const formData = new FormData();
-    formData.append('text', userText);
-    formData.append('audio', {
-      uri: userAudioUri,
-      type: 'audio/m4a',
-      name: 'recording.m4a',
-    } as any);
-    
-    const response = await fetch(`${getBaseUrl()}/agent/followup`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-      body: formData,
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Failed to post follow-up: ${response.status}`);
-    }
-    
-    return response.json();
-  }
+  // Read audio file as base64
+  const base64Audio = await FileSystem.readAsStringAsync(userAudioUri, {
+    encoding: FileSystem.EncodingType.Base64,
+  });
   
-  // Text-only request
+  // Build request payload
+  const payload: FollowUpRequest = {
+    id: threadId,
+    audio: base64Audio,
+    audioFormat: 'm4a',
+  };
+  
   const response = await fetch(`${getBaseUrl()}/agent/followup`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      text: userText,
-    }),
+    body: JSON.stringify(payload),
   });
   
   if (!response.ok) {
     throw new Error(`Failed to post follow-up: ${response.status}`);
   }
   
-  return response.json();
+  const data: FollowUpResponse = await response.json();
+  
+  // Convert response to ConversationMessage format
+  // Save base64 audio to cache and get local URI
+  const audioPath = `${FileSystem.cacheDirectory}response_${Date.now()}.${data.audioFormat}`;
+  await FileSystem.writeAsStringAsync(audioPath, data.audio, {
+    encoding: FileSystem.EncodingType.Base64,
+  });
+  
+  return {
+    id: data.id,
+    role: data.role,
+    text: data.text,
+    audioUrl: audioPath, // Local file URI for playback
+    created_at: data.created_at,
+  };
 }
 
 export function getLatestDecisionId(): string {

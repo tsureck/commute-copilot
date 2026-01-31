@@ -1,5 +1,4 @@
 import { AgentDecision, ConversationMessage } from '../types';
-import { generateId } from '../utils';
 import { Asset } from 'expo-asset';
 
 // Local audio files for AI voice
@@ -68,7 +67,7 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 // Mock decision data matching the backend format
 const mockDecision: AgentDecision = {
-  id: 'decision-001',
+  id: 'dec_u1_001',
   decision: 'WORK_FROM_HOME_TEMPORARILY',
   confidence: 0.88,
   currentUpdates: [
@@ -131,7 +130,7 @@ export async function getMockDecision(): Promise<AgentDecision> {
   const audioUrl = await getExplanationAudioUri();
   return { 
     ...mockDecision, 
-    id: generateId(), 
+    // Keep stable ID for thread tracking (don't regenerate)
     audioUrl,
     created_at: new Date().toISOString() 
   };
@@ -146,18 +145,19 @@ export async function getMockAudioUrl(decisionId: string): Promise<string> {
 }
 
 /**
- * Post a follow-up message and get AI response
+ * Post a follow-up with user audio and get AI response
+ * @param threadId - The conversation/decision thread ID
+ * @param userAudioUri - URI to user's recorded audio file
  */
 export async function postMockFollowUp(
-  userText: string,
-  userAudioUri?: string
+  threadId: string,
+  userAudioUri: string
 ): Promise<ConversationMessage> {
   await delay(1000);
   
-  // Log user audio for backend integration (single log point)
-  if (userAudioUri) {
-    console.log('🎤 [API] User audio URI:', userAudioUri);
-  }
+  // Log user audio for backend integration
+  console.log('🎤 [Mock API] Thread ID:', threadId);
+  console.log('🎤 [Mock API] User audio URI:', userAudioUri);
   
   // Get audio first (this increments followUpCount)
   const audioUrl = await getFollowupAudioUri();
@@ -169,7 +169,7 @@ export async function postMockFollowUp(
   const responseText = mockResponses[responseIndex].text;
   
   return {
-    id: generateId(),
+    id: threadId, // Return same thread ID for consistency
     role: 'assistant',
     text: responseText,
     audioUrl,
@@ -181,5 +181,5 @@ export async function postMockFollowUp(
  * Simulate receiving a new decision (for push notification trigger)
  */
 export function getLatestDecisionId(): string {
-  return mockDecision.id || 'decision-001';
+  return mockDecision.id;
 }

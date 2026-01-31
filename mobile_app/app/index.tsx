@@ -147,8 +147,8 @@ export default function HomeScreen() {
     if (audioRecorder.isRecording) {
       // Stop recording and process
       const result = await audioRecorder.stopRecording();
-      if (result) {
-        await sendMessage(result.transcription, result.audioUri);
+      if (result && decision?.id) {
+        await sendVoiceMessage(result.audioUri, result.transcription);
       }
     } else {
       // Start recording
@@ -157,15 +157,20 @@ export default function HomeScreen() {
     }
   };
 
-  const sendMessage = async (text: string, userAudioUri?: string) => {
+  const sendVoiceMessage = async (userAudioUri: string, mockTranscription?: string) => {
+    if (!decision?.id) {
+      console.error('No decision ID available');
+      return;
+    }
+    
     setIsSending(true);
     
-    // Add user message to conversation
+    // Add user message to conversation (use mock transcription for display in mock mode)
     const userMessage: ConversationMessage = {
-      id: generateId(),
+      id: decision.id,
       role: 'user',
-      text,
-      audioUrl: userAudioUri, // Store user's audio too
+      text: mockTranscription || '[Voice message]', // Display text (mock) or placeholder
+      audioUrl: userAudioUri, // Store user's audio
       created_at: new Date().toISOString(),
     };
     
@@ -177,8 +182,8 @@ export default function HomeScreen() {
     }, 100);
     
     try {
-      // Get AI response - send audio URI for backend processing
-      const response = await postFollowUp(text, userAudioUri);
+      // Send audio to backend with thread ID
+      const response = await postFollowUp(decision.id, userAudioUri);
       
       setConversation(prev => [...prev, response]);
       

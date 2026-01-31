@@ -29,7 +29,7 @@ export interface UIHints {
 }
 
 export interface AgentDecision {
-  id?: string;
+  id: string; // Thread/conversation ID - persists throughout conversation
   decision: string;
   confidence: number;
   currentUpdates: CurrentUpdate[];
@@ -37,15 +37,38 @@ export interface AgentDecision {
   explanationShort: string;
   explanationLong: string;
   uiHints: UIHints;
-  audioUrl?: string; // Set after audio API call
+  // Audio can be URL (mock) or base64 (real backend)
+  audioUrl?: string;
+  audio?: string; // Base64 encoded audio bytes
+  audioFormat?: string; // e.g., 'mp3', 'm4a'
   created_at?: string;
 }
 
+// Request payload for sending user audio to backend
+export interface FollowUpRequest {
+  id: string; // Thread/conversation ID
+  audio: string; // Base64 encoded audio bytes
+  audioFormat: string; // e.g., 'm4a'
+}
+
+// Response payload from backend
+export interface FollowUpResponse {
+  id: string; // Same thread/conversation ID
+  role: 'assistant';
+  text: string;
+  audio: string; // Base64 encoded audio bytes
+  audioFormat: string; // e.g., 'mp3'
+  created_at: string;
+}
+
 export interface ConversationMessage {
-  id: string;
+  id: string; // Thread ID for context
   role: 'user' | 'assistant';
   text: string;
+  // Audio can be URL (mock/local) or base64 (real backend)
   audioUrl?: string;
+  audio?: string; // Base64 encoded audio bytes
+  audioFormat?: string;
   isPlaying?: boolean;
   created_at: string;
 }
