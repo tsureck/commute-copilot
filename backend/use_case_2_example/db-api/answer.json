@@ -1,0 +1,48 @@
+{
+  "connections": [
+    {
+      "id": "conn_1",
+      "departure": "2026-01-31T16:34:00+01:00",
+      "arrival": "2026-01-31T17:49:00+01:00",
+      "durationMinutes": 75,
+      "legs": [
+        {
+          "mode": "train",
+          "line": "RE4",
+          "operator": "DB Regio",
+          "from": { "name": "Bremen Hbf" },
+          "to": { "name": "Hamburg Hbf" },
+          "scheduledDeparture": "2026-01-31T16:34:00+01:00",
+          "realtimeDeparture": "2026-01-31T16:34:00+01:00",
+          "scheduledArrival": "2026-01-31T17:49:00+01:00",
+          "realtimeArrival": "2026-01-31T17:49:00+01:00",
+          "status": "ON_TIME"
+        }
+      ]
+    },
+    {
+      "id": "conn_2",
+      "departure": "2026-01-31T17:34:00+01:00",
+      "arrival": "2026-01-31T18:49:00+01:00",
+      "durationMinutes": 75,
+      "legs": [
+        {
+          "mode": "train",
+          "line": "RE4",
+          "operator": "DB Regio",
+          "from": { "name": "Bremen Hbf" },
+          "to": { "name": "Hamburg Hbf" },
+          "scheduledDeparture": "2026-01-31T17:34:00+01:00",
+          "realtimeDeparture": "2026-01-31T17:34:00+01:00",
+          "scheduledArrival": "2026-01-31T18:49:00+01:00",
+          "realtimeArrival": "2026-01-31T18:49:00+01:00",
+          "status": "ON_TIME"
+        }
+      ]
+    }
+  ],
+  "queryMeta": {
+    "realtimeUsed": true,
+    "generatedAt": "2026-01-31T16:00:05+01:00"
+  }
+}

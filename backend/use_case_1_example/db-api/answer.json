@@ -1,0 +1,75 @@
+{
+    "connections": [
+      {
+        "id": "conn_1",
+        "departure": "2026-01-31T07:34:00+01:00",
+        "arrival": "2026-01-31T08:49:00+01:00",
+        "durationMinutes": 75,
+        "legs": [
+          {
+            "mode": "train",
+            "line": "RE4",
+            "operator": "DB Regio",
+            "from": { "name": "Hamburg Hbf" },
+            "to":   { "name": "Bremen Hbf" },
+            "scheduledDeparture": "2026-01-31T07:34:00+01:00",
+            "realtimeDeparture": null,
+            "scheduledArrival": "2026-01-31T08:49:00+01:00",
+            "realtimeArrival": null,
+            "status": "CANCELLED",
+            "remarks": [
+              "Cancelled due to operational disruption (e.g., signal failure)."
+            ]
+          }
+        ]
+      },
+      {
+        "id": "conn_2",
+        "departure": "2026-01-31T08:06:00+01:00",
+        "arrival": "2026-01-31T09:36:00+01:00",
+        "durationMinutes": 90,
+        "legs": [
+          {
+            "mode": "train",
+            "line": "RE4",
+            "operator": "DB Regio",
+            "from": { "name": "Hamburg Hbf" },
+            "to":   { "name": "Bremen Hbf" },
+            "scheduledDeparture": "2026-01-31T08:06:00+01:00",
+            "realtimeDeparture": "2026-01-31T08:18:00+01:00",
+            "delayMinutes": 12,
+            "scheduledArrival": "2026-01-31T09:21:00+01:00",
+            "realtimeArrival": "2026-01-31T09:36:00+01:00",
+            "status": "DELAYED",
+            "remarks": [
+              "Delay likely impacts arrival time."
+            ]
+          }
+        ]
+      },
+      {
+        "id": "conn_3",
+        "departure": "2026-01-31T08:34:00+01:00",
+        "arrival": "2026-01-31T09:49:00+01:00",
+        "durationMinutes": 75,
+        "legs": [
+          {
+            "mode": "train",
+            "line": "RE4",
+            "operator": "DB Regio",
+            "from": { "name": "Hamburg Hbf" },
+            "to":   { "name": "Bremen Hbf" },
+            "scheduledDeparture": "2026-01-31T08:34:00+01:00",
+            "realtimeDeparture": "2026-01-31T08:34:00+01:00",
+            "scheduledArrival": "2026-01-31T09:49:00+01:00",
+            "realtimeArrival": "2026-01-31T09:49:00+01:00",
+            "status": "ON_TIME"
+          }
+        ]
+      }
+    ],
+    "queryMeta": {
+      "realtimeUsed": true,
+      "generatedAt": "2026-01-31T07:10:05+01:00"
+    }
+  }  

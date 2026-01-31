@@ -1,0 +1,8 @@
+{
+    "from": { "id": "stop_hh_hbf", "name": "Hamburg Hbf" },
+    "to":   { "id": "stop_hb_hbf", "name": "Bremen Hbf" },
+    "departureTime": "2026-01-31T07:10:00+01:00",
+    "maxConnections": 3,
+    "useRealtime": true,
+    "includeRemarks": true
+  }  

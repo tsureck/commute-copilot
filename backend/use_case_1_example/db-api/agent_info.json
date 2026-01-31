@@ -1,0 +1,15 @@
+{
+    "timeNow": "2026-01-31T07:10:00+01:00",
+    "route": { "from": "Hamburg Hbf", "to": "Bremen Hbf", "preferredLine": "RE4" },
+    "connections": [
+      { "dep": "07:34", "arr": "08:49", "line": "RE4", "status": "CANCELLED" },
+      { "dep": "08:06", "arr": "09:36", "line": "RE4", "status": "DELAYED", "delayMin": 12 },
+      { "dep": "08:34", "arr": "09:49", "line": "RE4", "status": "ON_TIME" }
+    ],
+    "userContext": {
+      "homeOfficeAllowed": true,
+      "nextMeetingLocalTime": "10:30",
+      "avoidWaitingOutdoors": true
+    }
+  }
+  

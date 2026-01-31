@@ -1,0 +1,18 @@
+{
+  "timeNow": "2026-01-31T16:00:00+01:00",
+  "direction": "return",
+  "route": { "from": "Bremen Hbf", "to": "Hamburg Hbf", "preferredLine": "RE4" },
+  "connections": [
+    { "dep": "16:34", "arr": "17:49", "line": "RE4", "status": "ON_TIME" },
+    { "dep": "17:34", "arr": "18:49", "line": "RE4", "status": "ON_TIME" }
+  ],
+  "userContext": {
+    "homeOfficeAllowed": true,
+    "nextMeetingLocalTime": null,
+    "avoidWaitingOutdoors": true
+  },
+  "weatherForecast": {
+    "rainStartsLocalTime": "17:00",
+    "condition": "rain"
+  }
+}
