@@ -28,6 +28,7 @@ See [db-api/agent_info.json](db-api/agent_info.json) for the full structure the 
 
 | Field | Type | Description |
 |-------|------|-------------|
+| `id` | string (optional) | Id for push/reply reference; set by backend when creating decision |
 | `decision` | string | One of the values in [agent/decision-types.json](agent/decision-types.json) |
 | `confidence` | number | 0.0–1.0 |
 | `currentUpdates` | array | List of "what changed" cards (weather, transport): `type`, `icon`, `title`, `message`, `severity` (low/medium/high), optional `line` |
@@ -51,6 +52,43 @@ If the UI should show raw connections and/or build agent_info itself:
    - `POST .../decision`  
    - Request body: [db-api/agent_info.json](db-api/agent_info.json)  
    - Response: [agent/agent-decision.json](agent/agent-decision.json)
+
+---
+
+## Push & reply
+
+**Flow:** Backend computes a decision → sends a **push** (slim payload) → user clicks → frontend fetches full decision by id → shows info and plays **voice** → user can **reply** (accept / reject / modify) → for "modify", backend returns a new decision.
+
+### Push payload (backend → push / frontend)
+
+Slim payload for the notification and deep link. Backend builds it from the full **AgentDecision**. Type: **DecisionPushPayload** in [contracts.ts](contracts.ts).
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `decisionId` | string | Id of the decision; frontend uses it to fetch full decision or open deep link |
+| `decision` | string | Same as AgentDecision.decision |
+| `explanationShort` | string | Notification body text |
+| `recommendedDepartureTime` | string | HH:MM |
+| `title` | string (optional) | Notification title (e.g. "Commute update") |
+| `deepLink` | string (optional) | App deep link, e.g. `app://decision/{decisionId}` |
+
+### Fetch full decision (when user clicks)
+
+- **`GET .../decision/:id`** — Returns full **AgentDecision** for the given `id`. Frontend uses this after the user opens the notification (or uses cached decision if already present).
+
+### Voice
+
+When **uiHints.playVoiceSummary** is true, frontend uses **explanationLong** (or **recommendation.reasonLong**) for TTS. No separate voiceScript in MVP.
+
+### User reply (frontend → backend)
+
+- **`POST .../decision/:id/reply`** (or **`POST .../reply`** with body containing `decisionId`)  
+- **Request body:** **UserReply** — `decisionId`, `replyType` (`"accept"` | `"reject"` | `"modify"`), optional `userMessage`, optional `modifyConstraints` (see [contracts.ts](contracts.ts)).
+- **Response:**  
+  - **Accept / Reject:** 204 No Content (or 200 with `{ acknowledged: true }`).  
+  - **Modify:** 200 OK with body = new **AgentDecision** (new `id`); backend re-runs decision with user constraint (e.g. `minDepartureDelayMinutes: 120` or `userMessage`).
+
+Example modify reply: `{ "decisionId": "...", "replyType": "modify", "userMessage": "I want to leave at least two hours later", "modifyConstraints": { "minDepartureDelayMinutes": 120 } }`.
 
 ---
 
