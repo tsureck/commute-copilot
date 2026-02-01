@@ -1,3 +1,7 @@
+# Cursor 2-Day AI Hackathon — Repo Template
+
+![Cursor 2-Day AI Hackathon](https://ai-beavers.com/_next/image?url=%2Fimages%2Fhackathon-hero-20012026.png&w=1920&q=75)
+
 # Commute Copilot
 
 Commute Copilot is an AI decision agent that tells you when to commute, wait, or work from home using real-time transit, weather, and calendar context.
