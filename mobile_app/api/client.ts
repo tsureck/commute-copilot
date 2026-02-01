@@ -149,7 +149,7 @@ export async function postFollowUp(
     return {
       userTranscription: transcribedText,
       assistantMessage: {
-        id: assistantResponse.id,
+        id: `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
         role: 'assistant',
         text: assistantResponse.text,
         audioUrl: audioFileUri,
