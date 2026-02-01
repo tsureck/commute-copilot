@@ -48,8 +48,8 @@ export function resetFollowUpCount(): void {
 
 // Mock user transcriptions for the demo conversation flow
 const mockUserTranscriptions = [
-  "Can I stay longer in home office and take the 09:00 train instead?",
-  "How long can I push it if delays calm down?",
+  "Can I also stay two hours at home and take a later train?",
+  "What if the Client Presentation gets moved to the afternoon?",
 ];
 
 // Get the next user transcription for the demo
@@ -73,30 +73,37 @@ const mockDecision: AgentDecision = {
   currentUpdates: [
     {
       type: 'weather',
-      icon: 'rain',
-      title: 'Weather update',
-      message: 'Heavy rain for the next 30 minutes',
-      severity: 'medium',
+      icon: 'snow',
+      title: 'Weather warning',
+      message: 'Freezing rain and black ice warning until 09:00',
+      severity: 'high',
     },
     {
       type: 'transport',
       icon: 'train',
       title: 'RE4 status',
-      message: 'The RE4 is cancelled at 07:34 and delayed by 12 minutes at 08:06',
+      message: 'The RE4 at 07:15 is cancelled due to operational disruption',
       severity: 'high',
       line: 'RE4',
+    },
+    {
+      type: 'calendar',
+      icon: 'default',
+      title: 'Meeting conflict',
+      message: 'Daily Sync at 08:00 (online) — Client Presentation at 10:30 (on-site, Bremen)',
+      severity: 'high',
     },
   ],
   recommendation: {
     action: 'Start working from home',
-    primaryInstruction: 'Take the RE4 at 08:34',
-    recommendedDepartureTime: '08:34',
+    primaryInstruction: 'Take the RE4 at 08:15',
+    recommendedDepartureTime: '08:15',
     icon: 'train',
-    reasonShort: 'Earlier connections are cancelled or delayed.',
-    reasonLong: 'Leaving now would cause waiting time with uncertain arrival. Starting in home office and taking the stable RE4 at 08:34 ensures a reliable commute and arrival before your 10:30 meeting.',
+    reasonShort: 'Your 07:15 is cancelled and you have an on-site meeting at 10:30.',
+    reasonLong: 'Your usual RE4 at 07:15 is cancelled. Join the Daily Sync at 08:00 from home, then take the RE4 at 08:15. It arrives at 09:26 in Bremen — well before your Client Presentation at 10:30. Freezing rain and black ice make waiting at the station unsafe.',
   },
-  explanationShort: 'RE4 cancelled. Work from home and take the stable 08:34 connection.',
-  explanationLong: 'Your usual RE4 at 07:34 is cancelled and the following RE4 is delayed. Weather conditions also make waiting unpleasant. Starting in home office and leaving at 08:34 avoids stress and still gets you to Bremen well before your first meeting.',
+  explanationShort: 'RE4 at 07:15 cancelled. Join the 08:00 Daily from home, then take the 08:15 to make your 10:30 on-site meeting.',
+  explanationLong: 'Your usual RE4 at 07:15 is cancelled due to operational disruption. Freezing rain and black ice make waiting at the station dangerous. Your Daily Sync at 08:00 is online — join from home. Then take the RE4 at 08:15 which arrives at 09:26, getting you to the Bremen office well before your Client Presentation at 10:30.',
   uiHints: {
     highlightAction: true,
     playVoiceSummary: true,
@@ -109,16 +116,16 @@ const mockDecision: AgentDecision = {
 // Mock AI responses for the demo conversation flow
 const mockResponses = [
   {
-    // Response to: "Can I stay longer in home office and take the 09:00 train instead?"
-    text: "You can, but it's a gamble. The safe move is to leave a bit early and take the RE4 at 08:34.",
+    // Response to: "Can I also stay two hours at home and take a later train?"
+    text: "Unfortunately not. Your Daily Sync at 08:00 is online, so that's fine from home. But your Client Presentation at 10:30 is on-site in Bremen. The next RE4 after 08:15 is at 09:15, arriving at 10:26 — only 4 minutes before your meeting, way too risky. And the 10:15 arrives at 11:26, far too late. The 08:15 gets you there at 09:26 with plenty of buffer.",
   },
   {
-    // Response to: "How long can I push it if delays calm down?"
-    text: "It doesn't look like the delays are calming down. For now, stick with the RE4 at 8:34 to keep it reliable and stress-free for the 10:30 meeting.",
+    // Response to: "What if the Client Presentation gets moved to the afternoon?"
+    text: "If the Client Presentation moves to the afternoon, you'd have much more flexibility. You could comfortably take the RE4 at 09:15 or even 10:15. But as of now it's still at 10:30 on-site, so I'd stick with the 08:15.",
   },
   {
     // Fallback response for other questions
-    text: "Based on current conditions, I recommend sticking with the RE4 at 08:34. It's the most reliable option to ensure you arrive stress-free before your 10:30 meeting.",
+    text: "Based on current conditions, I'd recommend the RE4 at 08:15. Your Daily Sync at 08:00 is online — join from home. But the Client Presentation at 10:30 is on-site in Bremen, so you need the 08:15 to arrive at 09:26 in time.",
   },
 ];
 

@@ -12,7 +12,7 @@
 
 // Eleven Bridge FastAPI service for speech-to-text and text-to-speech
 // Using 10.0.2.2 for Android Emulator - change to your computer's IP for physical device
-export const ELEVEN_BRIDGE_BASE_URL = 'http://34.32.61.92';
+export const ELEVEN_BRIDGE_BASE_URL = 'http://34.32.43.148';
 
 // API key for Eleven Bridge authentication (X-API-Key header)
 // TODO: In production, store this securely (e.g., environment variable, secure storage)
