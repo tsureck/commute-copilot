@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Commute Copilot — Pitch Deck</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --surface-2: #1a1a26;
+    --border: #2a2a3a;
+    --text: #e8e8f0;
+    --text-muted: #8888a0;
+    --accent: #6366f1;
+    --accent-glow: rgba(99, 102, 241, 0.15);
+    --red: #ef4444;
+    --red-glow: rgba(239, 68, 68, 0.12);
+    --green: #22c55e;
+    --green-glow: rgba(34, 197, 94, 0.12);
+    --amber: #f59e0b;
+    --amber-glow: rgba(245, 158, 11, 0.12);
+  }
+
+  html { scroll-behavior: smooth; scroll-snap-type: y mandatory; }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    overflow-x: hidden;
+    line-height: 1.6;
+  }
+
+  /* Navigation */
+  nav {
+    position: fixed;
+    right: 24px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  nav a {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--border);
+    transition: all 0.3s;
+    display: block;
+  }
+  nav a:hover, nav a.active { background: var(--accent); box-shadow: 0 0 12px var(--accent); }
+
+  /* Slide base */
+  .slide {
+    min-height: 100vh;
+    scroll-snap-align: start;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 80px;
+    position: relative;
+    overflow: hidden;
+  }
+  .slide::before {
+    content: '';
+    position: absolute;
+    top: -200px;
+    right: -200px;
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .slide-inner {
+    max-width: 1200px;
+    width: 100%;
+    z-index: 1;
+  }
+
+  /* Slide number */
+  .slide-num {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 12px;
+  }
+
+  h1 {
+    font-size: 56px;
+    font-weight: 800;
+    line-height: 1.1;
+    margin-bottom: 16px;
+    letter-spacing: -1.5px;
+  }
+  h1 span.highlight { color: var(--accent); }
+  h1 span.red { color: var(--red); }
+
+  h2 {
+    font-size: 36px;
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 12px;
+    letter-spacing: -0.5px;
+  }
+
+  .subtitle {
+    font-size: 20px;
+    color: var(--text-muted);
+    font-weight: 400;
+    margin-bottom: 48px;
+    max-width: 700px;
+  }
+
+  /* Stat cards */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 20px;
+    margin-top: 36px;
+  }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px;
+    transition: transform 0.2s, border-color 0.2s;
+  }
+  .stat-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--accent);
+  }
+  .stat-card.red-tint { background: linear-gradient(135deg, var(--surface) 0%, var(--red-glow) 100%); }
+  .stat-card.green-tint { background: linear-gradient(135deg, var(--surface) 0%, var(--green-glow) 100%); }
+  .stat-card.amber-tint { background: linear-gradient(135deg, var(--surface) 0%, var(--amber-glow) 100%); }
+  .stat-card.accent-tint { background: linear-gradient(135deg, var(--surface) 0%, var(--accent-glow) 100%); }
+
+  .stat-number {
+    font-size: 40px;
+    font-weight: 800;
+    letter-spacing: -1px;
+    margin-bottom: 4px;
+  }
+  .stat-number.red { color: var(--red); }
+  .stat-number.green { color: var(--green); }
+  .stat-number.amber { color: var(--amber); }
+  .stat-number.accent { color: var(--accent); }
+
+  .stat-label {
+    font-size: 15px;
+    color: var(--text-muted);
+    font-weight: 400;
+    line-height: 1.4;
+  }
+  .stat-source {
+    font-size: 11px;
+    color: #555568;
+    margin-top: 8px;
+  }
+
+  /* Content blocks */
+  .content-cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 40px;
+    margin-top: 36px;
+  }
+
+  .pain-point {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .pain-icon {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    background: var(--red-glow);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+  }
+  .pain-text h3 {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .pain-text p {
+    font-size: 14px;
+    color: var(--text-muted);
+    line-height: 1.5;
+  }
+
+  /* Solution cards */
+  .solution-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 32px;
+    margin-bottom: 20px;
+  }
+  .solution-card h3 {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--accent);
+  }
+  .solution-card p {
+    font-size: 15px;
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+
+  /* Compare table */
+  .compare {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    margin-top: 24px;
+    font-size: 14px;
+  }
+  .compare th {
+    text-align: left;
+    padding: 14px 20px;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--border);
+    font-weight: 600;
+    color: var(--text-muted);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .compare th:first-child { border-radius: 12px 0 0 0; }
+  .compare th:last-child { border-radius: 0 12px 0 0; }
+  .compare td {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .compare tr:last-child td:first-child { border-radius: 0 0 0 12px; }
+  .compare tr:last-child td:last-child { border-radius: 0 0 12px 0; }
+  .compare .check { color: var(--green); font-weight: 700; }
+  .compare .cross { color: var(--red); opacity: 0.6; }
+
+  /* Pricing tiers */
+  .tiers {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    margin-top: 36px;
+  }
+  .tier {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 32px;
+    position: relative;
+  }
+  .tier.featured {
+    border-color: var(--accent);
+    box-shadow: 0 0 40px var(--accent-glow);
+  }
+  .tier-badge {
+    position: absolute;
+    top: -10px;
+    right: 20px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 12px;
+    border-radius: 20px;
+    letter-spacing: 0.5px;
+  }
+  .tier-name {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--text-muted);
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+  .tier-price {
+    font-size: 36px;
+    font-weight: 800;
+    margin-bottom: 4px;
+  }
+  .tier-price span { font-size: 16px; font-weight: 400; color: var(--text-muted); }
+  .tier-desc {
+    font-size: 14px;
+    color: var(--text-muted);
+    margin-bottom: 20px;
+    line-height: 1.5;
+  }
+  .tier-features {
+    list-style: none;
+    font-size: 14px;
+  }
+  .tier-features li {
+    padding: 6px 0;
+    color: var(--text-muted);
+  }
+  .tier-features li::before {
+    content: '→ ';
+    color: var(--accent);
+    font-weight: 700;
+  }
+
+  /* Unit economics */
+  .unit-econ {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 32px;
+    margin-top: 28px;
+  }
+  .unit-econ h3 {
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--text-muted);
+    font-weight: 600;
+    margin-bottom: 16px;
+  }
+  .unit-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 15px;
+  }
+  .unit-row:last-child { border-bottom: none; font-weight: 700; }
+  .unit-row .val { font-weight: 600; }
+  .unit-row .val.green { color: var(--green); }
+
+  /* GTM steps */
+  .gtm-steps {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 24px;
+    margin-top: 36px;
+  }
+  .gtm-step {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px;
+  }
+  .gtm-step-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: var(--accent-glow);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    color: var(--accent);
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 12px;
+  }
+  .gtm-step h3 {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .gtm-step p {
+    font-size: 14px;
+    color: var(--text-muted);
+    line-height: 1.5;
+  }
+
+  /* Why section */
+  .why-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+    margin-top: 36px;
+  }
+  .why-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 32px;
+  }
+  .why-card h3 {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: var(--accent);
+  }
+  .why-card p, .why-card li {
+    font-size: 15px;
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+  .why-card ul {
+    list-style: none;
+    margin-top: 8px;
+  }
+  .why-card li {
+    padding: 4px 0;
+  }
+  .why-card li::before {
+    content: '+ ';
+    color: var(--green);
+    font-weight: 700;
+  }
+
+  .big-quote {
+    font-size: 28px;
+    font-weight: 600;
+    font-style: italic;
+    line-height: 1.4;
+    color: var(--text);
+    margin-top: 40px;
+    padding-left: 24px;
+    border-left: 3px solid var(--accent);
+    max-width: 700px;
+  }
+  .big-quote .attr {
+    font-size: 14px;
+    font-style: normal;
+    font-weight: 400;
+    color: var(--text-muted);
+    margin-top: 8px;
+    display: block;
+  }
+
+  /* Keyboard hint */
+  .key-hint {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 12px;
+    color: var(--text-muted);
+    opacity: 0.5;
+    z-index: 100;
+  }
+
+  /* Responsive */
+  @media (max-width: 900px) {
+    .slide { padding: 40px 24px; }
+    h1 { font-size: 36px; }
+    h2 { font-size: 28px; }
+    .content-cols, .tiers, .gtm-steps, .why-grid { grid-template-columns: 1fr; }
+    .stats-grid { grid-template-columns: 1fr 1fr; }
+    nav { right: 12px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Navigation dots -->
+<nav>
+  <a href="#slide1" id="dot1"></a>
+  <a href="#slide2" id="dot2"></a>
+  <a href="#slide3" id="dot3"></a>
+  <a href="#slide4" id="dot4"></a>
+  <a href="#slide5" id="dot5"></a>
+</nav>
+
+<!-- ============================================ -->
+<!-- SLIDE 1: THE MARKET PROBLEM                  -->
+<!-- ============================================ -->
+<section class="slide" id="slide1">
+  <div class="slide-inner">
+    <div class="slide-num">01 &mdash; The Problem</div>
+    <h1>Transit Disruptions<span class="red"> Are Inevitable.</span><br>Bad Decisions Aren’t.</h1>
+    <p class="subtitle">Germany has 20.3 million daily commuters. 14% rely on public transit. And every day, they make the same blind gamble: will my train show up?</p>
+
+    <div class="stats-grid">
+      <div class="stat-card red-tint">
+        <div class="stat-number red">62.5%</div>
+        <div class="stat-label">Long-distance DB punctuality in 2024 &mdash; worst in 21 years. 1 in 3 trains delayed.</div>
+        <div class="stat-source">Deutsche Bahn KPIs 2024</div>
+      </div>
+      <div class="stat-card red-tint">
+        <div class="stat-number red">47 hrs</div>
+        <div class="stat-label">Lost per commuter per year to delays. Costing Germany &euro;5.3 billion annually.</div>
+        <div class="stat-source">INRIX 2025 Traffic Scorecard</div>
+      </div>
+      <div class="stat-card amber-tint">
+        <div class="stat-number amber">14.6M</div>
+        <div class="stat-label">Deutschlandticket holders &mdash; all dependent on a system DB admits is "outdated, fault-prone, and overloaded."</div>
+        <div class="stat-source">VDV 2025</div>
+      </div>
+      <div class="stat-card amber-tint">
+        <div class="stat-number amber">82%</div>
+        <div class="stat-label">Of German information-economy companies offer hybrid work &mdash; but no tool helps decide when to commute vs. stay home.</div>
+        <div class="stat-source">ZEW Mannheim 2024</div>
+      </div>
+    </div>
+
+    <div style="margin-top: 48px;">
+      <h2>How people solve it today</h2>
+      <div class="content-cols" style="margin-top: 24px;">
+        <div>
+          <div class="pain-point">
+            <div class="pain-icon">&#128683;</div>
+            <div class="pain-text">
+              <h3>DB Navigator / Google Maps</h3>
+              <p>Shows schedules and live delays &mdash; but never tells you "don't go." You find out your train is cancelled <em>after</em> you're already at the platform.</p>
+            </div>
+          </div>
+          <div class="pain-point">
+            <div class="pain-icon">&#128248;</div>
+            <div class="pain-text">
+              <h3>Twitter / Reddit / Zugfunk</h3>
+              <p>Crowdsourced disruption feeds. Reactive, noisy, zero personalization. You still have to interpret what it means for <em>your</em> commute.</p>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="pain-point">
+            <div class="pain-icon">&#129504;</div>
+            <div class="pain-text">
+              <h3>Gut feeling</h3>
+              <p>Most commuters just guess. "Weather looks bad, trains might be late." No data, no confidence. They over-commute or get burned.</p>
+            </div>
+          </div>
+          <div class="pain-point">
+            <div class="pain-icon">&#128188;</div>
+            <div class="pain-text">
+              <h3>Nothing for hybrid workers</h3>
+              <p>49% of German knowledge workers are hybrid. Zero apps combine train status + weather + calendar to answer: "Should I even go in today?"</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================ -->
+<!-- SLIDE 2: YOUR SOLUTION                       -->
+<!-- ============================================ -->
+<section class="slide" id="slide2">
+  <div class="slide-inner">
+    <div class="slide-num">02 &mdash; The Solution</div>
+    <h1>Commute <span class="highlight">Copilot</span></h1>
+    <p class="subtitle">An AI agent that monitors your commute route in real time and tells you <strong>what to do</strong> &mdash; not just what's happening. Voice-first, proactive, personal.</p>
+
+    <div class="content-cols">
+      <div>
+        <div class="solution-card">
+          <h3>Proactive, not reactive</h3>
+          <p>Checks train status, weather, and your calendar every 5 minutes between 6&ndash;10 AM. Sends a push notification <em>before</em> you leave home: "RE4 cancelled. Next reliable option at 08:34. Work from home until then."</p>
+        </div>
+        <div class="solution-card">
+          <h3>Voice-first conversation</h3>
+          <p>Ask follow-up questions by voice: "What if I need to be there by 11?" The AI reasons over stored context (train data, weather, calendar) and responds with a spoken recommendation.</p>
+        </div>
+        <div class="solution-card">
+          <h3>Actionable decisions, not data</h3>
+          <p>Outputs one of 4 clear actions: <strong>Leave now</strong>, <strong>Leave earlier</strong>, <strong>Wait and leave later</strong>, or <strong>Work from home</strong>. Each with a confidence score and reasoning you can drill into.</p>
+        </div>
+      </div>
+      <div>
+        <h2 style="margin-bottom: 20px;">10x better than alternatives</h2>
+        <table class="compare">
+          <thead>
+            <tr>
+              <th>Capability</th>
+              <th>DB Navigator</th>
+              <th>Google Maps</th>
+              <th style="color: var(--accent);">Commute Copilot</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Live train status</td>
+              <td class="check">&#10003;</td>
+              <td class="check">&#10003;</td>
+              <td class="check">&#10003;</td>
+            </tr>
+            <tr>
+              <td>Proactive alerts</td>
+              <td class="cross">&#10007;</td>
+              <td class="cross">&#10007;</td>
+              <td class="check">&#10003;</td>
+            </tr>
+            <tr>
+              <td>Weather-aware</td>
+              <td class="cross">&#10007;</td>
+              <td class="cross">&#10007;</td>
+              <td class="check">&#10003;</td>
+            </tr>
+            <tr>
+              <td>Calendar-aware</td>
+              <td class="cross">&#10007;</td>
+              <td class="cross">&#10007;</td>
+              <td class="check">&#10003;</td>
+            </tr>
+            <tr>
+              <td>"Should I go?" decision</td>
+              <td class="cross">&#10007;</td>
+              <td class="cross">&#10007;</td>
+              <td class="check">&#10003;</td>
+            </tr>
+            <tr>
+              <td>Voice conversation</td>
+              <td class="cross">&#10007;</td>
+              <td class="cross">&#10007;</td>
+              <td class="check">&#10003;</td>
+            </tr>
+            <tr>
+              <td>Hybrid work support</td>
+              <td class="cross">&#10007;</td>
+              <td class="cross">&#10007;</td>
+              <td class="check">&#10003;</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="big-quote" style="margin-top: 40px;">
+          "80% of all delays are due to Germany's outdated, fault-prone, and overloaded infrastructure."
+          <span class="attr">&mdash; Deutsche Bahn spokesperson, 2024</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================ -->
+<!-- SLIDE 3: BUSINESS MODEL                      -->
+<!-- ============================================ -->
+<section class="slide" id="slide3">
+  <div class="slide-inner">
+    <div class="slide-num">03 &mdash; Business Model</div>
+    <h1>Who pays &mdash; and <span class="highlight">how much</span></h1>
+    <p class="subtitle">Two revenue streams: individuals who value their time, and employers who value their team's productivity.</p>
+
+    <div class="tiers">
+      <div class="tier">
+        <div class="tier-name">B2C &mdash; Free</div>
+        <div class="tier-price">&euro;0<span>/mo</span></div>
+        <div class="tier-desc">Core experience. Get hooked on never being surprised by DB again.</div>
+        <ul class="tier-features">
+          <li>1 commute route</li>
+          <li>Morning push notification</li>
+          <li>Basic decision (leave / wait / stay)</li>
+          <li>Ad-supported or limited checks</li>
+        </ul>
+      </div>
+      <div class="tier featured">
+        <div class="tier-badge">CORE REVENUE</div>
+        <div class="tier-name">B2C &mdash; Pro</div>
+        <div class="tier-price">&euro;4.99<span>/mo</span></div>
+        <div class="tier-desc">For the daily commuter. Less than a single Bahncard surcharge.</div>
+        <ul class="tier-features">
+          <li>Unlimited routes</li>
+          <li>Voice conversation follow-ups</li>
+          <li>Calendar integration</li>
+          <li>Weather-aware reasoning</li>
+          <li>Historical reliability insights</li>
+        </ul>
+      </div>
+      <div class="tier">
+        <div class="tier-name">B2B &mdash; Teams</div>
+        <div class="tier-price">&euro;3<span>/user/mo</span></div>
+        <div class="tier-desc">For hybrid employers. Know when your team can realistically make it in.</div>
+        <ul class="tier-features">
+          <li>Team commute dashboard</li>
+          <li>Office occupancy prediction</li>
+          <li>HR / Slack integration</li>
+          <li>Commute policy compliance</li>
+          <li>Volume discounts (100+ seats)</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="unit-econ">
+      <h3>Unit Economics (B2C Pro)</h3>
+      <div class="unit-row">
+        <span>Monthly subscription</span>
+        <span class="val">&euro;4.99</span>
+      </div>
+      <div class="unit-row">
+        <span>LLM API cost (Gemini Flash, ~60 calls/mo)</span>
+        <span class="val">&minus;&euro;0.15</span>
+      </div>
+      <div class="unit-row">
+        <span>ElevenLabs TTS/STT (~30 voice interactions)</span>
+        <span class="val">&minus;&euro;0.40</span>
+      </div>
+      <div class="unit-row">
+        <span>Infrastructure (Supabase, hosting, amortized)</span>
+        <span class="val">&minus;&euro;0.30</span>
+      </div>
+      <div class="unit-row">
+        <span>Gross margin per user</span>
+        <span class="val green">&euro;4.14 (83%)</span>
+      </div>
+    </div>
+
+    <div class="stats-grid" style="margin-top: 28px;">
+      <div class="stat-card accent-tint">
+        <div class="stat-number accent">14.6M</div>
+        <div class="stat-label">Deutschlandticket holders = built-in addressable market of transit-dependent users already paying for mobility.</div>
+      </div>
+      <div class="stat-card green-tint">
+        <div class="stat-number green">~7M</div>
+        <div class="stat-label">Germans commute 30+ km one way. These long-distance commuters are most disruption-prone and most willing to pay.</div>
+        <div class="stat-source">BBSR 2023</div>
+      </div>
+      <div class="stat-card accent-tint">
+        <div class="stat-number accent">&euro;750</div>
+        <div class="stat-label">Average annual cost of delays per commuter. Copilot at &euro;60/year is 12x cheaper than the problem.</div>
+        <div class="stat-source">INRIX 2025</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================ -->
+<!-- SLIDE 4: GO-TO-MARKET                        -->
+<!-- ============================================ -->
+<section class="slide" id="slide4">
+  <div class="slide-inner">
+    <div class="slide-num">04 &mdash; Go-to-Market</div>
+    <h1>First 10 customers,<br>then <span class="highlight">10,000</span></h1>
+    <p class="subtitle">Start hyper-local on the most disrupted corridor. Expand route by route as the product proves itself.</p>
+
+    <div class="gtm-steps">
+      <div class="gtm-step">
+        <div class="gtm-step-num">1</div>
+        <h3>Hamburg &harr; Bremen corridor</h3>
+        <p>~391,900 cross-border commuters into Hamburg alone. The RE4 line is notoriously unreliable. Target commuters on this specific route through local Reddit (r/hamburg, r/bremen), Jodel, and LinkedIn posts. Goal: <strong>50 beta users in week 1.</strong></p>
+      </div>
+      <div class="gtm-step">
+        <div class="gtm-step-num">2</div>
+        <h3>Deutschlandticket communities</h3>
+        <p>14.6M subscribers actively discussing transit pain on social media. Partner with Deutschlandticket influencers and transit advocacy groups. Freemium converts frustrated users who already pay &euro;58/mo for unreliable service.</p>
+      </div>
+      <div class="gtm-step">
+        <div class="gtm-step-num">3</div>
+        <h3>B2B through HR / People Ops</h3>
+        <p>Pitch to hybrid companies in Hamburg & Bremen: "Know which of your employees can actually make it in today." Target 3&ndash;5 mid-size companies (100&ndash;500 employees) with flexible work policies. Offer 30-day free pilot.</p>
+      </div>
+      <div class="gtm-step">
+        <div class="gtm-step-num">4</div>
+        <h3>Expand to top 5 disrupted corridors</h3>
+        <p>After proving product-market fit on Hamburg&ndash;Bremen, replicate on Frankfurt&ndash;Mannheim (under renovation until 2030), Munich S-Bahn, Ruhrgebiet network, Berlin&ndash;Brandenburg ring. Each corridor = new organic growth loop.</p>
+      </div>
+    </div>
+
+    <div style="margin-top: 40px;">
+      <h2>Distribution advantages</h2>
+      <div class="content-cols" style="margin-top: 20px;">
+        <div class="solution-card">
+          <h3>Viral by nature</h3>
+          <p>"My app told me to stay home today and I dodged a 90-minute delay" is the kind of story people share at the office. Every disrupted morning = free word of mouth.</p>
+        </div>
+        <div class="solution-card">
+          <h3>API partnership potential</h3>
+          <p>Commute intelligence as a service for day-planning apps (Notion Calendar, Morgen, Reclaim.ai), corporate travel tools, and smart home routines. Data moat grows with every user.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================ -->
+<!-- SLIDE 5: WHY YOU / WHY NOW                   -->
+<!-- ============================================ -->
+<section class="slide" id="slide5">
+  <div class="slide-inner">
+    <div class="slide-num">05 &mdash; Why Us / Why Now</div>
+    <h1>The moment is <span class="highlight">now</span></h1>
+    <p class="subtitle">Three forces converging: DB's worst reliability in 21 years, the Deutschlandticket putting millions on transit, and LLMs making real-time reasoning cheap enough to run per-user.</p>
+
+    <div class="why-grid">
+      <div class="why-card">
+        <h3>Why now</h3>
+        <ul>
+          <li>DB punctuality hit historic low (62.5%) &mdash; and &euro;17B renovation plan means years of construction disruptions ahead</li>
+          <li>14.6M Deutschlandticket users = largest wave of new transit riders in German history, all experiencing the pain fresh</li>
+          <li>Gemini Flash / GPT-4o mini make per-user LLM reasoning viable at &lt;&euro;0.01/decision</li>
+          <li>ElevenLabs + Whisper make voice-first interfaces production-ready for the first time</li>
+          <li>82% of knowledge-economy firms now hybrid &mdash; "should I commute?" is a daily question that didn't exist pre-2020</li>
+        </ul>
+      </div>
+      <div class="why-card">
+        <h3>What we built in 48 hours</h3>
+        <ul>
+          <li>Working mobile app (React Native / Expo) with voice recording and playback</li>
+          <li>Real-time train data pipeline (transport.rest API &rarr; n8n &rarr; Supabase)</li>
+          <li>AI reasoning engine (Gemini) that produces actionable commute decisions</li>
+          <li>Voice conversation loop: speak &rarr; STT &rarr; LLM &rarr; TTS &rarr; audio response</li>
+          <li>Push notification system for proactive morning alerts</li>
+          <li>Full "store once, reason many" architecture for multi-turn context</li>
+        </ul>
+      </div>
+      <div class="why-card">
+        <h3>Why this team</h3>
+        <p>We are commuters on this exact route. We've personally experienced the RE4 cancellation cascade, the "should I just work from home?" dilemma, and the frustration of DB Navigator telling you about a problem when it's already too late. We built this because <em>we needed it yesterday</em>.</p>
+      </div>
+      <div class="why-card">
+        <h3>The vision</h3>
+        <p>Commute Copilot becomes your <strong>daily mobility brain</strong>. Starting with "should I commute?", expanding to "how should I plan my whole day around transit reality?" Integrates with calendars, smart homes, employers, and eventually any planning app that needs to know: can this person physically get there on time?</p>
+      </div>
+    </div>
+
+    <div class="big-quote">
+      "We'd work on this full-time. The problem isn't going away &mdash; DB's own target is only 70% punctuality by 2029. That's 5 more years of broken commutes. We're building the intelligence layer that makes it survivable."
+    </div>
+  </div>
+</section>
+
+<div class="key-hint">Scroll to navigate &bull; 5 slides</div>
+
+<script>
+  // Active dot tracking
+  const dots = document.querySelectorAll('nav a');
+  const slides = document.querySelectorAll('.slide');
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const id = entry.target.id;
+        const num = id.replace('slide', '');
+        dots.forEach(d => d.classList.remove('active'));
+        document.getElementById('dot' + num).classList.add('active');
+      }
+    });
+  }, { threshold: 0.5 });
+  slides.forEach(s => observer.observe(s));
+
+  // Keyboard navigation
+  let current = 0;
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowRight' || e.key === ' ') {
+      e.preventDefault();
+      current = Math.min(current + 1, slides.length - 1);
+      slides[current].scrollIntoView({ behavior: 'smooth' });
+    } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+      e.preventDefault();
+      current = Math.max(current - 1, 0);
+      slides[current].scrollIntoView({ behavior: 'smooth' });
+    }
+  });
+</script>
+
+</body>
+</html>

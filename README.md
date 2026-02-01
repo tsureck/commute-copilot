@@ -1,50 +1,61 @@
-# Cursor 2-Day AI Hackathon — Repo Template
+# Commute Copilot
 
-![Cursor 2-Day AI Hackathon](https://ai-beavers.com/_next/image?url=%2Fimages%2Fhackathon-hero-20012026.png&w=1920&q=75)
+Commute Copilot is an AI decision agent that tells you when to commute, wait, or work from home using real-time transit, weather, and calendar context.
 
-**How to use this template:**
-1. Click "Use this template" → "Create a new repository"
-2. Name your repo and set it to **Public**
-3. Replace this section with your project name and description
+## How It Works
 
----
-
-# Project Name
-
-> One-line description of your project
+1. **Monitors your route** — checks live train status, weather, and your calendar every 5 minutes (6–10 AM)
+2. **Sends a push notification** when something changes — with a clear recommendation, not just raw delay data
+3. **Speaks the reasoning** — tap play to hear why the AI recommends what it does
+4. **Voice follow-ups** — ask questions like "Can I still make my 10 AM meeting?" and get a spoken, context-aware answer
+5. **Consistent reasoning** — all follow-ups reference the same data snapshot ("store once, reason many times")
 
 ## Tech Stack
 
-What technologies power your project?
-
-<!-- List your main technologies, frameworks, and services -->
-
-- **Frontend**: e.g., Next.js, React, Tailwind
-- **Backend**: e.g., Node.js, Python, FastAPI
-- **Database**: e.g., Supabase, Firebase, PostgreSQL
-- **AI/ML**: e.g., OpenAI GPT-4, Gemini Pro
-- **Hosting**: e.g., Vercel, Railway
+| Component | Technology |
+|-----------|------------|
+| Mobile App | React Native, Expo 54, TypeScript |
+| AI Reasoning | Google Gemini 2.5 Flash |
+| Voice | ElevenLabs (STT via Scribe, TTS via Matilda) |
+| Orchestration | n8n workflows |
+| Database | Supabase (PostgreSQL) |
+| Live Data | transport.rest (DB trains), Open-Meteo (weather) |
 
 ## How to Run
 
-Step-by-step instructions to run the project locally, including everything that needs to be set up.
-
 ```bash
-# Clone the repo
-git clone https://github.com/your-team/your-project.git
-cd your-project
-
-# Install dependencies
+cd mobile_app
 npm install
-
-# Set up environment variables
-cp .env.example .env
-# Add your API keys to .env
-
-# Run the development server
-npm run dev
+npx expo start
 ```
 
-## Details
+Scan the QR code with Expo Go on your phone, or press `a` for Android emulator / `i` for iOS simulator.
 
-Add anything else you want to share: architecture diagrams, screenshots, challenges faced, future plans, etc.
+## Architecture
+
+```
+Mobile App (Expo)
+    │
+    │
+    └─ Voice Chat ─┬─► ElevenLabs Bridge (FastAPI) ── STT/TTS
+                   │
+                   └─► n8n Webhooks ─┬─► transport.rest (trains)
+                                     ├─► Open-Meteo (weather)
+                                     ├─► Google Calendar
+                                     ├─► Gemini (LLM reasoning)
+                                     └─► Supabase (store context + decisions)
+```
+
+**Key design principle:** When a decision is requested, n8n fetches external data once and stores it in `context_snapshots`. All follow-up questions reason over the stored snapshot — no re-fetching, consistent answers.
+
+## Decision Types
+
+The AI produces one of four actions:
+
+| Action | When |
+|--------|------|
+| `LEAVE_NOW` | Your train is on time, go catch it |
+| `LEAVE_EARLIER_THAN_USUAL` | Disruptions ahead, beat them by leaving early |
+| `WAIT_AND_LEAVE_LATER` | Current trains disrupted, a later one is reliable |
+| `WORK_FROM_HOME_TEMPORARILY` | Major disruption, stay home until it clears |
+
