@@ -1,8 +1,8 @@
 import { AgentDecision, ConversationMessage, Settings, FollowUpRequest, FollowUpResponse, FollowUpResult } from '../types';
 import { getMockDecision, getMockAudioUrl, postMockFollowUp, getLatestDecisionId as getMockLatestId, resetFollowUpCount as resetMockFollowUpCount } from './mock';
 import * as FileSystem from 'expo-file-system';
-import { speechToText, sendUserAnswer, textToSpeech } from '../src/api';
-import { ELEVEN_BRIDGE_BASE_URL, N8N_BASE_URL } from '../src/config';
+import { speechToText, textToSpeech } from './elevenBridge';
+import { sendUserAnswer } from './n8n';
 
 let currentSettings: Settings | null = null;
 

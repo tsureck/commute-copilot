@@ -20,19 +20,11 @@ import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system';
 import * as Haptics from 'expo-haptics';
 import { theme } from '../theme';
+import { ELEVEN_BRIDGE_BASE_URL, N8N_BASE_URL, DEFAULT_DECISION_ID } from '@/config';
 
 // ============================================================================
 // Configuration
 // ============================================================================
-
-// Eleven Bridge FastAPI service for speech-to-text and text-to-speech
-const ELEVEN_BRIDGE_BASE_URL = 'http://localhost:8000';
-
-// n8n workflow backend for assistant responses
-const N8N_BASE_URL = 'https://prothos.app.n8n.cloud/webhook-test';
-
-// Default decision ID for the hackathon demo
-const DEFAULT_DECISION_ID = 'dec_u1_001';
 
 // ============================================================================
 // Types
@@ -65,11 +57,7 @@ async function speechToText(
   audioFormat: 'm4a' | 'mp3' | 'wav' | 'webm'
 ): Promise<string> {
   const url = `${ELEVEN_BRIDGE_BASE_URL}/speech_to_text/`;
-  // #region agent log
-  console.log('[DEBUG] API CALL: POST', url);
-  console.log('[DEBUG] Request data: { decisionId:', decisionId, ', audioFormat:', audioFormat, ', audio.length:', audio.length, '}');
-  // #endregion
-  
+
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
