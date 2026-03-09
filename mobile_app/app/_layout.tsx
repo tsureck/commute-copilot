@@ -37,20 +37,6 @@ export default function RootLayout() {
             }}
           />
           <Stack.Screen
-            name="decision/[decisionId]"
-            options={{
-              title: 'Details',
-              headerBackTitle: 'Back',
-            }}
-          />
-          <Stack.Screen
-            name="chat"
-            options={{
-              title: 'Chat',
-              headerBackTitle: 'Back',
-            }}
-          />
-          <Stack.Screen
             name="settings"
             options={{
               title: 'Settings',
