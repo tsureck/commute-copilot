@@ -20,7 +20,9 @@ import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system';
 import * as Haptics from 'expo-haptics';
 import { theme } from '../theme';
-import { ELEVEN_BRIDGE_BASE_URL, N8N_BASE_URL, DEFAULT_DECISION_ID } from '@/config';
+import { DEFAULT_DECISION_ID } from '@/config';
+import { textToSpeech, speechToText } from '@/api/elevenBridge';
+import { sendUserAnswer } from '@/api/n8n';
 
 // ============================================================================
 // Configuration
@@ -45,112 +47,6 @@ interface ChatMessage {
   audioBase64?: string;
   audioFormat?: 'mp3';
   created_at: string;
-}
-
-// ============================================================================
-// API Functions
-// ============================================================================
-
-async function speechToText(
-  decisionId: string,
-  audio: string,
-  audioFormat: 'm4a' | 'mp3' | 'wav' | 'webm'
-): Promise<string> {
-  const url = `${ELEVEN_BRIDGE_BASE_URL}/speech_to_text/`;
-
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ decisionId, audio, audioFormat }),
-  });
-
-  // #region agent log
-  console.log('[DEBUG] Response status:', response.status);
-  // #endregion
-  
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
-    // #region agent log
-    console.log('[DEBUG] STT Error:', error);
-    // #endregion
-    throw new Error(error.detail || `STT failed: ${response.status}`);
-  }
-
-  const data = await response.json();
-  // #region agent log
-  console.log('[DEBUG] STT Response text:', data.text);
-  // #endregion
-  return data.text;
-}
-
-async function sendUserAnswer(
-  decisionId: string,
-  text: string
-): Promise<{ id: string; role: 'assistant'; text: string; created_at: string }> {
-  const url = `${N8N_BASE_URL}/user_answer`;
-  // #region agent log
-  console.log('[DEBUG] API CALL: POST', url);
-  console.log('[DEBUG] Request data: { decisionId:', decisionId, ', text:', text, '}');
-  // #endregion
-  
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ decisionId, text }),
-  });
-
-  // #region agent log
-  console.log('[DEBUG] Response status:', response.status);
-  // #endregion
-  
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
-    // #region agent log
-    console.log('[DEBUG] n8n Error:', error);
-    // #endregion
-    throw new Error(error.detail || `n8n failed: ${response.status}`);
-  }
-
-  const data = await response.json();
-  // #region agent log
-  console.log('[DEBUG] n8n Response:', data);
-  // #endregion
-  return data;
-}
-
-async function textToSpeech(
-  decisionId: string,
-  text: string
-): Promise<{ audio: string; audioFormat: 'mp3' }> {
-  const url = `${ELEVEN_BRIDGE_BASE_URL}/text_to_speech/`;
-  // #region agent log
-  console.log('[DEBUG] API CALL: POST', url);
-  console.log('[DEBUG] Request data: { decisionId:', decisionId, ', text:', text, '}');
-  // #endregion
-  
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ decisionId, text }),
-  });
-
-  // #region agent log
-  console.log('[DEBUG] Response status:', response.status);
-  // #endregion
-  
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
-    // #region agent log
-    console.log('[DEBUG] TTS Error:', error);
-    // #endregion
-    throw new Error(error.detail || `TTS failed: ${response.status}`);
-  }
-
-  const data = await response.json();
-  // #region agent log
-  console.log('[DEBUG] TTS Response audio.length:', data.audio?.length, 'format:', data.audioFormat);
-  // #endregion
-  return data;
 }
 
 // ============================================================================
